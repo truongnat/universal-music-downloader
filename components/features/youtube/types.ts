@@ -1,15 +1,15 @@
 export interface YouTubeItem {
     id: string;
-    title: string;
-    thumbnail: string;
-    duration?: number; // in seconds
-    uploader?: string;
-    url: string;
     kind: "video" | "playlist";
+    title: string;
+    uploader?: string;
+    duration?: number;
+    thumbnail: string;
+    url: string;
 }
 
 export interface DownloadProgress {
     id: string;
     progress: number;
-    status: "waiting" | "downloading" | "completed" | "error";
+    status: "downloading" | "completed" | "error";
 }
