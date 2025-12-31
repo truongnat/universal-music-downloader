@@ -121,45 +121,39 @@ export function SearchTabContent({
         setTracks([]);
         toast.warning(`Không tìm thấy kết quả nào cho "${searchQuery}"`);
       } else {
-        const newResults: SearchResultItem[] = data.collection.map((item) => {
-          if (item.kind === "track") {
+        const newResults: SearchResultItem[] = data.collection
+          .filter((item) => item.kind === "track" || item.kind === "playlist")
+          .map((item) => {
+            if (item.kind === "track") {
+              return {
+                id: String(item.id),
+                kind: "track",
+                title: item.title,
+                artist:
+                  item.user?.username ||
+                  item.publisher_metadata?.artist ||
+                  "Unknown Artist",
+                duration: item.duration / 1000,
+                thumbnail: item.artwork_url || "/default-thumbnail.jpg",
+                url: item.permalink_url,
+              };
+            } else if (item.kind === "playlist") {
+              return {
+                id: String(item.id),
+                kind: "playlist",
+                title: item.title,
+                thumbnail: item.artwork_url || "/default-playlist.jpg",
+                url: item.permalink_url,
+              };
+            }
             return {
-              id: String(item.id),
-              kind: "track",
-              title: item.title,
-              artist:
-                item.user?.username ||
-                item.publisher_metadata?.artist ||
-                "Unknown Artist",
-              duration: new Date(item.duration).toISOString().substr(14, 5),
-              thumbnail: item.artwork_url || "/default-thumbnail.jpg",
-              url: item.permalink_url,
+              id: String((item as SoundCloudSearchItem).id),
+              kind: (item as SoundCloudSearchItem).kind as "track", // Fallback, though ideally all kinds are handled
+              title: "Unknown Type",
+              thumbnail: "/default-thumbnail.jpg",
+              url: "",
             };
-          } else if (item.kind === "user") {
-            return {
-              id: String(item.id),
-              kind: "user",
-              title: item.username,
-              thumbnail: item.avatar_url || "/default-avatar.jpg",
-              url: item.permalink_url,
-            };
-          } else if (item.kind === "playlist") {
-            return {
-              id: String(item.id),
-              kind: "playlist",
-              title: item.title,
-              thumbnail: item.artwork_url || "/default-playlist.jpg",
-              url: item.permalink_url,
-            };
-          }
-          return {
-            id: String((item as SoundCloudSearchItem).id),
-            kind: (item as SoundCloudSearchItem).kind as "track", // Fallback, though ideally all kinds are handled
-            title: "Unknown Type",
-            thumbnail: "/default-thumbnail.jpg",
-            url: "",
-          };
-        });
+          });
 
         if (isLoadMore) {
           setTracks((prev: SearchResultItem[]) => {

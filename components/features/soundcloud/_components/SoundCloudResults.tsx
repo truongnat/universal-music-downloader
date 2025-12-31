@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, DownloadCloud } from "lucide-react";
-import { SearchResultCard } from "../SearchResultCard";
+import { ResultCard } from "@/components/common/ResultCard";
 import { SearchResultItem, DownloadProgress } from "../types";
 
 interface SoundCloudResultsProps {
@@ -86,17 +86,16 @@ export const SoundCloudResults = React.forwardRef<HTMLDivElement, SoundCloudResu
                     </div>
                     <CardContent className="px-8 py-6 space-y-6">
                         <div className="space-y-4">
-                            {tracks.map((item, index) => (
+                            {tracks.map((item) => (
                                 <div key={item.id} className="py-2">
-                                    <SearchResultCard
+                                    <ResultCard
                                         item={item}
-                                        index={index}
                                         progress={getProgress(item.id)}
                                         onDownload={onDownloadSingle}
-                                        isAnyLoading={isAnyLoading}
-                                        clientId={clientId}
+                                        isDownloadingAll={isAnyLoading}
                                         activePreviewId={previewItem?.id}
                                         onPreview={onPreview}
+                                        source="soundcloud"
                                         dict={dict}
                                     />
                                 </div>

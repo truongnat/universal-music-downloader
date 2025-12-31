@@ -70,7 +70,7 @@ export function SingleTrackTabContent({
         kind: "track",
         title: track.title,
         artist: track.user.username,
-        duration: new Date(track.duration).toISOString().substr(14, 5),
+        duration: track.duration / 1000,
         thumbnail: track.artwork_url,
         url: track.permalink_url,
       };

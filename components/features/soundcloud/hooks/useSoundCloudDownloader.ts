@@ -111,8 +111,8 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
         }
 
         setDownloadProgress((prev) => [
-            ...prev.filter((p) => p.trackId !== item.id),
-            { trackId: item.id, progress: 0, status: "downloading" },
+            ...prev.filter((p) => p.id !== item.id),
+            { id: item.id, progress: 0, status: "downloading" },
         ]);
 
         toast.info(t("start_download_count").replace("{count}", item.title));
@@ -171,7 +171,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
                     const progress = Math.round((receivedLength / totalLength) * 100);
                     setDownloadProgress((prev) =>
                         prev.map((p) =>
-                            p.trackId === item.id ? { ...p, progress } : p
+                            p.id === item.id ? { ...p, progress } : p
                         )
                     );
                 }
@@ -193,7 +193,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
 
             setDownloadProgress((prev) =>
                 prev.map((p) =>
-                    p.trackId === item.id ? { ...p, progress: 100, status: "completed" } : p
+                    p.id === item.id ? { ...p, progress: 100, status: "completed" } : p
                 )
             );
             toast.success(`${t("success_download")}: "${item.title}"`);
@@ -202,7 +202,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
             toast.error(`${t("error_download")}: "${item.title}"`);
             setDownloadProgress((prev) =>
                 prev.map((p) =>
-                    p.trackId === item.id ? { ...p, status: "error" } : p
+                    p.id === item.id ? { ...p, status: "error" } : p
                 )
             );
         }
@@ -218,7 +218,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
 
         const tracksToDownload = tracks.filter((item) => {
             if (item.kind !== "track") return false;
-            const progress = downloadProgress.find(p => p.trackId === item.id);
+            const progress = downloadProgress.find(p => p.id === item.id);
             return progress?.status !== 'completed';
         });
 
@@ -239,8 +239,8 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
         toast.success(t("all_downloaded"));
     }, [tracks, handleDownloadSingle, downloadProgress, t]);
 
-    const getProgressForTrack = useCallback((trackId: string) => {
-        return downloadProgress.find((p) => p.trackId === trackId);
+    const getProgressForTrack = useCallback((id: string) => {
+        return downloadProgress.find((p) => p.id === id);
     }, [downloadProgress]);
 
     const handlePreview = useCallback((item: SearchResultItem) => {
