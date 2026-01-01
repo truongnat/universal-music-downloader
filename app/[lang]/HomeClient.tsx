@@ -6,6 +6,7 @@ import { Music, Youtube } from "lucide-react";
 // Components
 import { SoundCloudDownloader } from "@/components/features/soundcloud/SoundCloudDownloader";
 import { YouTubeDownloader } from "@/components/features/youtube/YouTubeDownloader";
+import { SpotifyDownloader } from "@/components/features/spotify/SpotifyDownloader";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { HeroSection } from "@/components/home/HeroSection";
@@ -89,6 +90,11 @@ export default function HomeClient({ dict }: { dict: Dictionary }) {
                                     label: dict.tabs.youtube,
                                     icon: <Youtube className={`w-4 h-4 ${activeTab === "youtube" ? "text-red-500" : ""}`} />,
                                 },
+                                {
+                                    id: "spotify",
+                                    label: "Spotify",
+                                    icon: <Music className={`w-4 h-4 ${activeTab === "spotify" ? "text-green-500" : ""}`} />,
+                                },
                             ]}
                         />
                     </div>
@@ -105,6 +111,9 @@ export default function HomeClient({ dict }: { dict: Dictionary }) {
                         </TabsContent>
                         <TabsContent value="youtube" className="mt-0">
                             <YouTubeDownloader dict={{ ...dict.youtube, common: dict.common }} />
+                        </TabsContent>
+                        <TabsContent value="spotify" className="mt-0">
+                            <SpotifyDownloader dict={{ ...dict.youtube, common: dict.common }} />
                         </TabsContent>
                     </motion.div>
                 </Tabs>

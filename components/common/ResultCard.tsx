@@ -40,7 +40,7 @@ interface ResultCardProps {
     activePreviewId?: string | null;
     onPreview?: (item: MediaItem) => void;
     dict?: { common?: { [key: string]: string } };
-    source: "soundcloud" | "youtube";
+    source: "soundcloud" | "youtube" | "spotify";
 }
 
 export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadingAll, activePreviewId, onPreview, dict, source }: ResultCardProps) => {
@@ -64,8 +64,8 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
         return `${min}:${sec.toString().padStart(2, '0')}`;
     };
 
-    const SourceIcon = source === 'soundcloud' ? Music : Youtube;
-    const iconColor = source === 'soundcloud' ? 'text-orange-500' : 'text-red-500';
+    const SourceIcon = source === 'soundcloud' ? Music : source === 'youtube' ? Youtube : Music;
+    const iconColor = source === 'soundcloud' ? 'text-orange-500' : source === 'youtube' ? 'text-red-500' : 'text-green-500';
 
     return (
         <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
