@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { downloadFromYouTube } from "@/lib/spotify-api";
-import { Readable } from "stream";
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -11,19 +10,18 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const { stream, headers } = await downloadFromYouTube(url);
+        const { stream } = await downloadFromYouTube(url);
 
-        // Ensure stream is a ReadableStream
-        const readableStream = new Readable().wrap(stream);
+        const isPreview = searchParams.get("preview") === "true";
 
-        return new NextResponse(readableStream as any, {
-            status: 200,
-            headers: {
-                "Content-Type": "audio/mpeg",
-                "Content-Disposition": `attachment; filename="track.mp3"`,
-                ...headers,
-            },
-        });
+        // Return the stream
+        const headers = new Headers();
+        headers.set("Content-Disposition", `${isPreview ? 'inline' : 'attachment'}; filename="download.mp3"`);
+        headers.set("Content-Type", "audio/mpeg");
+
+        // @ts-ignore - Next.js supports passing a Node.js stream or Web ReadableStream
+        return new NextResponse(stream as any, { headers });
+
     } catch (error: any) {
         console.error("Download Error:", error);
         return NextResponse.json(

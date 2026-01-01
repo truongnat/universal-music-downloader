@@ -11,5 +11,5 @@ export interface SpotifyItem {
 export interface DownloadProgress {
     id: string;
     progress: number;
-    status: 'downloading' | 'completed' | 'error' | 'pending';
+    status: 'downloading' | 'completed' | 'error';
 }

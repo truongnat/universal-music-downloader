@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import pLimit from "p-limit";
 import { useUrlState } from "@/lib/use-url-state";
-import { SpotifyItem, DownloadProgress } from "./types";
+import { SpotifyItem, DownloadProgress } from "../types";
 
 const getConcurrencyLimit = () => {
     if (typeof navigator !== "undefined" && navigator.hardwareConcurrency) {

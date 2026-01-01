@@ -53,12 +53,12 @@ export const getSpotifyPlaylist = async (url: string) => {
 
 export const downloadFromYouTube = async (youtubeUrl: string) => {
     const yt = await initYtDlp();
-    const stream = yt.exec([
+    const stream = yt.execStream([
         youtubeUrl,
         ...ffmpegArgs,
         "-f", "bestaudio[ext=m4a]/bestaudio",
         "-o", "-",
     ]);
 
-    return { stream: stream.stdout, headers: {} };
+    return { stream: stream, headers: {} };
 };
