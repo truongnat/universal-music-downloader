@@ -6,6 +6,9 @@ export interface SearchResultItem {
     duration?: number;
     thumbnail?: string;
     url: string;
+    genre?: string;
+    releaseDate?: string;
+    artworkUrl?: string;
 }
 
 export interface DownloadProgress {
