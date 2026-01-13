@@ -12,8 +12,10 @@ import {
     Music,
     Youtube,
     User,
+    Share,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ShareDialog } from "./ShareDialog";
 
 interface MediaItem {
     id: string;
@@ -24,6 +26,8 @@ interface MediaItem {
     artist?: string;
     duration?: number;
     kind: "track" | "video" | "playlist";
+    genre?: string;
+    releaseDate?: string;
 }
 
 interface DownloadProgress {
@@ -46,6 +50,7 @@ interface ResultCardProps {
 export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadingAll, activePreviewId, onPreview, dict, source }: ResultCardProps) => {
     const t = (key: string) => dict?.common?.[key] || key;
     const [isCopied, setIsCopied] = React.useState(false);
+    const [isShareOpen, setIsShareOpen] = React.useState(false);
 
     const isDownloading = progress?.status === "downloading";
     const isCompleted = progress?.status === "completed";
@@ -102,6 +107,20 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                         </>
                     )}
                 </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    {item.genre && (
+                        <>
+                            <Music className="w-3 h-3" />
+                            <span>{item.genre}</span>
+                        </>
+                    )}
+                    {item.releaseDate && (
+                        <>
+                            <span className="mx-1">•</span>
+                            <span>{new Date(item.releaseDate).toLocaleDateString()}</span>
+                        </>
+                    )}
+                </div>
                 {progress && (
                     <div className="mt-2">
                         <Progress value={progress.progress} className="h-1" />
@@ -122,19 +141,6 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                 <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => {
-                        navigator.clipboard.writeText(item.url);
-                        toast.success(t("success_copy"));
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    title={t("copy_link")}
-                >
-                    {isCopied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                </Button>
-                <Button
-                    size="icon"
-                    variant="ghost"
                     onClick={() => onDownload(item)}
                     disabled={isDownloading || isDownloadingAll}
                     title={isCompleted ? t("downloaded") : isDownloading ? t("downloading") : t("download")}
@@ -147,7 +153,34 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                         <Download className="w-5 h-5" />
                     )}
                 </Button>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsShareOpen(true)}
+                    title={t("share")}
+                >
+                    <Share className="w-5 h-5" />
+                </Button>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                        navigator.clipboard.writeText(item.url);
+                        toast.success(t("success_copy"));
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    title={t("copy_link")}
+                >
+                    {isCopied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                </Button>
             </div>
+            <ShareDialog
+                item={item}
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
+                dict={dict}
+            />
         </div>
     );
 });
