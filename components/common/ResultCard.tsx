@@ -12,8 +12,12 @@ import {
     Music,
     Youtube,
     User,
+    Plus,
+    Minus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDownloadQueue } from "@/contexts/DownloadQueueProvider";
+import { SoundCloudTrack } from "@/types/soundcloud";
 
 interface MediaItem {
     id: string;
@@ -46,7 +50,9 @@ interface ResultCardProps {
 export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadingAll, activePreviewId, onPreview, dict, source }: ResultCardProps) => {
     const t = (key: string) => dict?.common?.[key] || key;
     const [isCopied, setIsCopied] = React.useState(false);
+    const { addToQueue, removeFromQueue, isInQueue } = useDownloadQueue();
 
+    const isQueued = isInQueue(parseInt(item.id, 10));
     const isDownloading = progress?.status === "downloading";
     const isCompleted = progress?.status === "completed";
     const isPlaying = activePreviewId === item.id;
@@ -145,6 +151,42 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                         <Download className="w-5 h-5 animate-pulse" />
                     ) : (
                         <Download className="w-5 h-5" />
+                    )}
+                </Button>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                        if (isQueued) {
+                            removeFromQueue(parseInt(item.id, 10));
+                        } else {
+                            const track: SoundCloudTrack = {
+                                id: parseInt(item.id, 10),
+                                kind: "track",
+                                title: item.title,
+                                duration: item.duration || 0,
+                                permalink_url: item.url,
+                                artwork_url: item.thumbnail || "",
+                                user: {
+                                    id: 0,
+                                    kind: "user",
+                                    username: item.artist || "Unknown Artist",
+                                    avatar_url: "",
+                                    permalink_url: "",
+                                },
+                                media: {
+                                    transcodings: [],
+                                },
+                            };
+                            addToQueue(track);
+                        }
+                    }}
+                    title={isQueued ? "Remove from Queue" : "Add to Queue"}
+                >
+                    {isQueued ? (
+                        <Minus className="w-5 h-5 text-red-500" />
+                    ) : (
+                        <Plus className="w-5 h-5 text-blue-500" />
                     )}
                 </Button>
             </div>
