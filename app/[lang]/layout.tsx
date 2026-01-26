@@ -5,8 +5,10 @@ import "../globals.css";
 
 // Contexts & Components
 import { ClientIdProvider } from "@/contexts/ClientIdProvider";
+import { DownloadQueueProvider } from "@/contexts/DownloadQueueProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HeaderControls, FooterControls } from "@/components/common/LayoutUI";
+import { DownloadQueue } from "@/components/features/download/DownloadQueue";
 import { getDictionary } from "../get-dictionary";
 import { getClientIdApiPath } from "@/lib/get-api-endpoint";
 
@@ -142,16 +144,19 @@ export default async function RootLayout({
         />
 
         <ClientIdProvider initialClientId={initialClientId}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <HeaderControls />
-            {children}
-            <FooterControls />
-          </ThemeProvider>
+          <DownloadQueueProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <HeaderControls />
+              {children}
+              <FooterControls />
+              <DownloadQueue />
+            </ThemeProvider>
+          </DownloadQueueProvider>
         </ClientIdProvider>
       </body>
     </html>
