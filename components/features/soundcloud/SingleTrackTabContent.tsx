@@ -73,6 +73,9 @@ export function SingleTrackTabContent({
         duration: track.duration / 1000,
         thumbnail: track.artwork_url,
         url: track.permalink_url,
+        genre: track.genre,
+        releaseDate: track.release_date,
+        artworkUrl: track.artwork_url,
       };
       setTracks([newTrack]);
       toast.success("Đã tìm thấy bài hát");

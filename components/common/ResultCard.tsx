@@ -14,10 +14,12 @@ import {
     User,
     Plus,
     Minus,
+    Share
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDownloadQueue } from "@/contexts/DownloadQueueProvider";
 import { SoundCloudTrack } from "@/types/soundcloud";
+import { ShareDialog } from "./ShareDialog";
 
 interface MediaItem {
     id: string;
@@ -28,6 +30,8 @@ interface MediaItem {
     artist?: string;
     duration?: number;
     kind: "track" | "video" | "playlist";
+    genre?: string;
+    releaseDate?: string;
 }
 
 interface DownloadProgress {
@@ -44,7 +48,7 @@ interface ResultCardProps {
     activePreviewId?: string | null;
     onPreview?: (item: MediaItem) => void;
     dict?: { common?: { [key: string]: string } };
-    source: "soundcloud" | "youtube";
+    source: "soundcloud" | "youtube" | "spotify";
 }
 
 export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadingAll, activePreviewId, onPreview, dict, source }: ResultCardProps) => {
@@ -70,8 +74,8 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
         return `${min}:${sec.toString().padStart(2, '0')}`;
     };
 
-    const SourceIcon = source === 'soundcloud' ? Music : Youtube;
-    const iconColor = source === 'soundcloud' ? 'text-orange-500' : 'text-red-500';
+    const SourceIcon = source === 'soundcloud' ? Music : source === 'youtube' ? Youtube : Music;
+    const iconColor = source === 'soundcloud' ? 'text-orange-500' : source === 'youtube' ? 'text-red-500' : 'text-green-500';
 
     return (
         <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -108,6 +112,20 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                         </>
                     )}
                 </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    {item.genre && (
+                        <>
+                            <Music className="w-3 h-3" />
+                            <span>{item.genre}</span>
+                        </>
+                    )}
+                    {item.releaseDate && (
+                        <>
+                            <span className="mx-1">•</span>
+                            <span>{new Date(item.releaseDate).toLocaleDateString()}</span>
+                        </>
+                    )}
+                </div>
                 {progress && (
                     <div className="mt-2">
                         <Progress value={progress.progress} className="h-1" />
@@ -124,19 +142,6 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                     title={isPlaying ? t("stop") : t("preview")}
                 >
                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                </Button>
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                        navigator.clipboard.writeText(item.url);
-                        toast.success(t("success_copy"));
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    title={t("copy_link")}
-                >
-                    {isCopied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                 </Button>
                 <Button
                     size="icon"
@@ -190,6 +195,12 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                     )}
                 </Button>
             </div>
+            <ShareDialog
+                item={item}
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
+                dict={dict}
+            />
         </div>
     );
 });
