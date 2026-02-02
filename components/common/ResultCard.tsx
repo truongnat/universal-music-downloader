@@ -12,9 +12,13 @@ import {
     Music,
     Youtube,
     User,
-    Share,
+    Plus,
+    Minus,
+    Share
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDownloadQueue } from "@/contexts/DownloadQueueProvider";
+import { SoundCloudTrack } from "@/types/soundcloud";
 import { ShareDialog } from "./ShareDialog";
 
 interface MediaItem {
@@ -50,8 +54,9 @@ interface ResultCardProps {
 export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadingAll, activePreviewId, onPreview, dict, source }: ResultCardProps) => {
     const t = (key: string) => dict?.common?.[key] || key;
     const [isCopied, setIsCopied] = React.useState(false);
-    const [isShareOpen, setIsShareOpen] = React.useState(false);
+    const { addToQueue, removeFromQueue, isInQueue } = useDownloadQueue();
 
+    const isQueued = isInQueue(parseInt(item.id, 10));
     const isDownloading = progress?.status === "downloading";
     const isCompleted = progress?.status === "completed";
     const isPlaying = activePreviewId === item.id;
@@ -156,23 +161,38 @@ export const ResultCard = React.memo(({ item, progress, onDownload, isDownloadin
                 <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => setIsShareOpen(true)}
-                    title={t("share")}
-                >
-                    <Share className="w-5 h-5" />
-                </Button>
-                <Button
-                    size="icon"
-                    variant="ghost"
                     onClick={() => {
-                        navigator.clipboard.writeText(item.url);
-                        toast.success(t("success_copy"));
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
+                        if (isQueued) {
+                            removeFromQueue(parseInt(item.id, 10));
+                        } else {
+                            const track: SoundCloudTrack = {
+                                id: parseInt(item.id, 10),
+                                kind: "track",
+                                title: item.title,
+                                duration: item.duration || 0,
+                                permalink_url: item.url,
+                                artwork_url: item.thumbnail || "",
+                                user: {
+                                    id: 0,
+                                    kind: "user",
+                                    username: item.artist || "Unknown Artist",
+                                    avatar_url: "",
+                                    permalink_url: "",
+                                },
+                                media: {
+                                    transcodings: [],
+                                },
+                            };
+                            addToQueue(track);
+                        }
                     }}
-                    title={t("copy_link")}
+                    title={isQueued ? "Remove from Queue" : "Add to Queue"}
                 >
-                    {isCopied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                    {isQueued ? (
+                        <Minus className="w-5 h-5 text-red-500" />
+                    ) : (
+                        <Plus className="w-5 h-5 text-blue-500" />
+                    )}
                 </Button>
             </div>
             <ShareDialog
