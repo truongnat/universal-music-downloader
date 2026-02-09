@@ -1,8 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import pLimit from "p-limit";
-import { useUrlState } from "@/lib/use-url-state";
 import { YouTubeItem, DownloadProgress } from "../types";
+import { useFFmpeg } from "@/hooks/use-ffmpeg";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
+
+type Mp3QualityKbps = 128 | 320;
 
 const getConcurrencyLimit = () => {
     if (typeof navigator !== "undefined" && navigator.hardwareConcurrency) {
@@ -13,44 +19,35 @@ const getConcurrencyLimit = () => {
 
 const limit = pLimit(getConcurrencyLimit());
 
-interface UseYouTubeDownloaderProps {
-    dict?: {
-        common?: {
-            [key: string]: string;
-        };
-    };
-}
+const mimeToFileExtension = (mime: string) => {
+    const lower = mime.toLowerCase();
+    if (lower.includes("audio/mp4") || lower.includes("video/mp4")) return "m4a";
+    if (lower.includes("audio/webm") || lower.includes("video/webm")) return "webm";
+    if (lower.includes("audio/ogg") || lower.includes("application/ogg") || lower.includes("opus")) return "ogg";
+    if (lower.includes("audio/mpeg")) return "mp3";
+    if (lower.includes("audio/wav")) return "wav";
+    if (lower.includes("audio/flac")) return "flac";
+	return "bin";
+};
 
-export function useYouTubeDownloader({ dict }: UseYouTubeDownloaderProps) {
-    const t = useCallback((key: string) => {
-        return dict?.common?.[key] || key;
-    }, [dict]);
-
-    const { setOnlyQueryParams, getQueryParam } = useUrlState();
+export function useYouTubeDownloader() {
+    const t = useCallback((key: string) => COMMON_DICT[key] || key, []);
 
     // State
-    const [activeTab, setActiveTab] = useState(() => getQueryParam("yt_tab") || "search");
+    const [activeTab, setActiveTab] = useState<"single" | "playlist">("single");
     const [items, setItems] = useState<YouTubeItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState<DownloadProgress[]>([]);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
     const [previewItem, setPreviewItem] = useState<YouTubeItem | null>(null);
     const resultsRef = useRef<HTMLDivElement>(null);
 
-    const isAnyLoading = isLoading || isDownloadingAll;
+    const { processAudio, isLoading: isFFmpegLoading } = useFFmpeg();
 
-    // Effects
-    useEffect(() => {
-        setItems([]);
-        setError(null);
-        setIsLoading(false);
-        setDownloadProgress([]);
-        setIsDownloadingAll(false);
-        setPage(1);
-        setPreviewItem(null);
-    }, [activeTab]);
+    const [mp3QualityKbps, setMp3QualityKbps] = useState<Mp3QualityKbps>(320);
+
+    const isAnyLoading = isLoading || isDownloadingAll || isFFmpegLoading;
 
     const handleNewResults = useCallback(() => {
         if (resultsRef.current && !isLoading) {
@@ -71,17 +68,25 @@ export function useYouTubeDownloader({ dict }: UseYouTubeDownloaderProps) {
     // Handlers
     const handleTabChange = useCallback((value: string) => {
         if (!isAnyLoading) {
+            if (value !== "single" && value !== "playlist") return;
             setActiveTab(value);
-            setOnlyQueryParams({ yt_tab: value });
+            setItems([]);
+            setError(null);
+            setIsLoading(false);
+            setDownloadProgress([]);
+            setIsDownloadingAll(false);
+            setPreviewItem(null);
         }
-    }, [isAnyLoading, setOnlyQueryParams]);
+    }, [isAnyLoading]);
 
     const handleDownloadSingle = useCallback(async (item: YouTubeItem) => {
         setDownloadProgress(prev => [...prev.filter(p => p.id !== item.id), { id: item.id, progress: 0, status: "downloading" }]);
         toast.info(`${t("start_download")}: "${item.title}"`);
 
         try {
-            const downloadUrl = `/api/youtube/download?url=${encodeURIComponent(item.url)}&format=mp3`;
+            // Updated API URL to include title for better fallback naming if FFmpeg fails
+            // Updated API URL to use the selected format and title
+            const downloadUrl = `/api/youtube/download?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}`;
             const response = await fetch(downloadUrl);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: t("error_download") }));
@@ -107,15 +112,54 @@ export function useYouTubeDownloader({ dict }: UseYouTubeDownloaderProps) {
 
                 if (totalLength) {
                     const progress = Math.round((receivedLength / totalLength) * 100);
-                    setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, progress } : p));
+                    // Share 70% of progress for downloading, 30% for FFmpeg processing
+                    setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, progress: Math.round(progress * 0.7) } : p));
                 }
             }
 
-            const blob = new Blob(chunks as any, { type: 'audio/mpeg' });
-            const blobUrl = window.URL.createObjectURL(blob);
+            const upstreamContentType =
+              response.headers.get("Content-Type") || "application/octet-stream";
+            const rawExt = mimeToFileExtension(upstreamContentType);
+
+            const mergedBytes = new Uint8Array(receivedLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+              mergedBytes.set(chunk, offset);
+              offset += chunk.length;
+            }
+
+            const rawBlob = new Blob([mergedBytes], { type: upstreamContentType });
+
+            // --- FFmpeg Client Side Processing (required) ---
+            let finalBlob: Blob;
+            const finalExt: string = "mp3";
+            try {
+                toast.info(`${t("processing_ffmpeg")}: "${item.title}"`);
+                const itemMetadata = {
+                    title: item.title,
+                    artist: item.uploader,
+                    album: "YouTube",
+                } as const;
+
+                finalBlob = await processAudio(rawBlob, {
+                    ...itemMetadata,
+                    format: "mp3",
+                    mp3BitrateKbps: mp3QualityKbps,
+                });
+                setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, progress: 100 } : p));
+            } catch (ffmpegErr) {
+                console.warn("FFmpeg processing failed", ffmpegErr);
+                const message =
+                    ffmpegErr instanceof Error ? ffmpegErr.message : "Unknown error";
+                toast.error(`FFmpeg conversion failed: "${item.title}" (${message})`);
+                setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, status: "error" } : p));
+                return;
+            }
+
+            const blobUrl = window.URL.createObjectURL(finalBlob);
             const a = document.createElement('a');
             a.href = blobUrl;
-            a.download = `${item.title}.mp3`;
+            a.download = `${item.title}.${finalExt}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -128,7 +172,7 @@ export function useYouTubeDownloader({ dict }: UseYouTubeDownloaderProps) {
             toast.error(`${t("error_download")}: "${item.title}" (${err.message})`);
             setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, status: "error" } : p));
         }
-    }, [t]);
+    }, [t, processAudio, mp3QualityKbps]);
 
     const handleDownloadAll = useCallback(async () => {
         const videosToDownload = items.filter(i => {
@@ -168,41 +212,35 @@ export function useYouTubeDownloader({ dict }: UseYouTubeDownloaderProps) {
         }
     }, [previewItem]);
 
-    const handleLoadMore = useCallback(() => {
-        setPage(p => p + 1);
-    }, []);
-
     const handleRetry = useCallback(() => {
         setError(null);
     }, []);
-
 
     return {
         state: {
             activeTab,
             items,
             isLoading,
-            page,
             downloadProgress,
             isDownloadingAll,
             error,
             previewItem,
             isAnyLoading,
             resultsRef,
+            mp3QualityKbps,
         },
         actions: {
             setActiveTab: handleTabChange,
             setItems,
             setIsLoading,
             setError,
-            setPage,
             handleDownloadSingle,
             handleDownloadAll,
             handlePreview,
             setPreviewItem,
             getProgress,
-            handleLoadMore,
             handleRetry,
+            setMp3QualityKbps,
         }
     };
 }

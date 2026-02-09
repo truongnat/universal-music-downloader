@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffectEvent } from 'react';
 import { getClientIdApiPath } from '@/lib/get-api-endpoint';
 
 interface ClientIdContextType {
@@ -16,26 +16,27 @@ export const ClientIdProvider = ({ children, initialClientId }: { children: Reac
   const [isLoading, setIsLoading] = useState(!initialClientId);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const handleFetchClientId = useCallback(async () => {
+
     if (initialClientId) return;
-
-    const fetchClientId = async () => {
-      try {
-        const res = await fetch(getClientIdApiPath());
-        const { clientId, error } = await res.json();
-        if (error) {
-          throw new Error(error);
-        }
-        setClientId(clientId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setIsLoading(false);
+    try {
+      const res = await fetch(getClientIdApiPath());
+      const { clientId, error } = await res.json();
+      if (error) {
+        throw new Error(error);
       }
-    };
+      setClientId(clientId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialClientId])
 
-    fetchClientId();
-  }, [initialClientId]);
+
+  useEffectEvent(() => {
+    handleFetchClientId();
+  });
 
   return (
     <ClientIdContext.Provider value={{ clientId, isLoading, error }}>

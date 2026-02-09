@@ -63,6 +63,7 @@ export function ActionInputBar({
                 onClick={() => onChange("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
                 type="button"
+                aria-label="Clear"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -74,7 +75,9 @@ export function ActionInputBar({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
+                  <title>Clear</title>
                   <path d="M18 6 6 18" />
                   <path d="m6 6 12 12" />
                 </svg>

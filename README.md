@@ -1,13 +1,13 @@
-# SoundCloud Downloader
+# Universal Music Downloader
 
-This is a web application built with Next.js that allows users to download songs and playlists from SoundCloud.
+This is a comprehensive web application built with Next.js that allows users to download songs and playlists from SoundCloud and YouTube.
 
 ## Features
 
-*   **Download Single Tracks:** Enter a SoundCloud track URL to download the song in MP3 format.
-*   **Download Playlists:** Enter a SoundCloud playlist URL to download all the songs in the playlist.
-*   **Search for Songs:** Search for songs on SoundCloud and download them directly from the search results.
-*   **Responsive Design:** The application is designed to work on both desktop and mobile devices.
+*   **Multi-Platform Support:** Download from SoundCloud and YouTube.
+*   **Download Single Tracks:** Enter a track URL to download the song in MP3 format.
+*   **Download Playlists:** Enter a playlist URL to download all songs in the playlist.
+*   **Responsive Design:** Optimized for both desktop and mobile devices.
 
 ## Getting Started
 
@@ -42,20 +42,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## Usage
 
 1.  Open the application in your browser.
-2.  Select one of the tabs: "Single Track", "Playlist", or "Search".
-3.  **Single Track:** Enter the URL of the SoundCloud track you want to download and click the "Download" button.
-4.  **Playlist:** Enter the URL of the SoundCloud playlist you want to download and click the "Download" button.
-5.  **Search:** Enter a search query to find songs on SoundCloud. The search results will be displayed, and you can download any song by clicking the "Download" button next to it.
+2.  Paste a SoundCloud or YouTube URL.
+3.  Choose an output format (MP3/WAV/FLAC).
+4.  Click "Go" to load the track/playlist, then download.
 
 ## API Endpoints
 
 The application uses the following API endpoints:
 
 *   `/api/soundcloud/get-client-id`: Retrieves the SoundCloud client ID required for making API requests.
-*   `/api/soundcloud/search?q={query}`: Searches for songs on SoundCloud based on the provided query.
 *   `/api/soundcloud/song?url={song-url}`: Retrieves information about a single SoundCloud track.
 *   `/api/soundcloud/playlist?url={playlist-url}`: Retrieves information about a SoundCloud playlist.
 *   `/api/soundcloud/download?url={download-url}`: Downloads the song from the provided download URL.
+*   `/api/youtube/info`: Retrieves info for a YouTube video or playlist (POST).
+*   `/api/youtube/download?url={video-url}`: Streams best audio for a YouTube video (client converts via FFmpeg.wasm).
 
 ## Technologies Used
 
@@ -83,7 +83,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 *   **Solid Foundation:** The project is built on a modern and robust tech stack, including Next.js, TypeScript, and Tailwind CSS. This provides a solid foundation for future development and scalability.
 *   **Clear and Intuitive UI:** The user interface is clean, simple, and easy to use. The tab-based navigation makes it easy for users to switch between different download options.
 *   **Good Separation of Concerns:** The use of API routes for handling backend logic ensures a good separation of concerns between the frontend and backend.
-*   **Internationalization Support:** The project includes support for internationalization, which makes it accessible to a wider audience.
+*   **Core Logic:** The project is well-structured and easy to maintain.
 
 #### Weaknesses
 

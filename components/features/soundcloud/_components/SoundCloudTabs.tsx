@@ -2,21 +2,31 @@ import React from "react";
 import { Tabs } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
-import { Search, PlayCircle, ListMusic, Music } from "lucide-react";
+import { PlayCircle, ListMusic, Music } from "lucide-react";
+import dictionary from "@/lib/dictionary.json";
 
 interface SoundCloudTabsProps {
     activeTab: string;
     onTabChange: (value: string) => void;
-    dict?: any;
     children: React.ReactNode;
+    hideTabsList?: boolean;
 }
 
 export function SoundCloudTabs({
     activeTab,
     onTabChange,
-    dict,
     children,
+    hideTabsList,
 }: SoundCloudTabsProps) {
+    const dict = dictionary;
+    if (hideTabsList) {
+        return (
+            <Tabs value={activeTab} onValueChange={onTabChange}>
+                {children}
+            </Tabs>
+        );
+    }
+
     return (
         <div>
             <Card className="backdrop-blur-sm">
@@ -38,18 +48,13 @@ export function SoundCloudTabs({
                                 onTabChange={onTabChange}
                                 tabs={[
                                     {
-                                        id: "search",
-                                        label: dict?.tabs.search || "Tìm kiếm",
-                                        icon: <Search className="w-4 h-4" />,
-                                    },
-                                    {
                                         id: "single",
-                                        label: dict?.tabs.single || "Một bài",
+                                        label: (dict as any).soundcloud.tabs.single || "Single",
                                         icon: <PlayCircle className="w-4 h-4" />,
                                     },
                                     {
                                         id: "playlist",
-                                        label: dict?.tabs.playlist || "Playlist",
+                                        label: (dict as any).soundcloud.tabs.playlist || "Playlist",
                                         icon: <ListMusic className="w-4 h-4" />,
                                     },
                                 ]}

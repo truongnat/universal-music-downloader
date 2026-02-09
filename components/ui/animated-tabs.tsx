@@ -21,13 +21,14 @@ interface AnimatedTabsProps {
 export function AnimatedTabs({ tabs, activeTab, onTabChange, className, layoutId = "active-tab-bubble" }: AnimatedTabsProps) {
     return (
         <div className={cn("inline-flex items-center justify-center p-1.5 bg-muted/20 backdrop-blur-sm rounded-full border border-border/50", className)}>
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => onTabChange(tab.id)}
-                    className={cn(
-                        "relative px-6 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full min-w-[120px]",
-                        activeTab === tab.id ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
+	            {tabs.map((tab) => (
+	                <button
+	                    type="button"
+	                    key={tab.id}
+	                    onClick={() => onTabChange(tab.id)}
+	                    className={cn(
+	                        "relative px-6 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full min-w-[120px]",
+	                        activeTab === tab.id ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
                     )}
                     style={{
                         WebkitTapHighlightColor: "transparent",

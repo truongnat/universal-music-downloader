@@ -1,10 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import pLimit from "p-limit";
-import { useUrlState } from "@/lib/use-url-state";
 import { useClientId } from "@/contexts/ClientIdProvider";
 import { getDownloadApiPath } from "@/lib/get-api-endpoint";
 import { SearchResultItem, DownloadProgress } from "../types";
+import { useFFmpeg } from "@/hooks/use-ffmpeg";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
+
+type Mp3QualityKbps = 128 | 320;
 
 const getConcurrencyLimit = () => {
     if (typeof navigator !== "undefined" && navigator.hardwareConcurrency) {
@@ -15,58 +21,38 @@ const getConcurrencyLimit = () => {
 
 const limit = pLimit(getConcurrencyLimit());
 
-interface UseSoundCloudDownloaderProps {
-    dict?: {
-        common?: {
-            [key: string]: string;
-        };
-    };
-}
+const mimeToFileExtension = (mime: string) => {
+    const lower = mime.toLowerCase();
+    if (lower.includes("audio/mp4") || lower.includes("video/mp4")) return "m4a";
+    if (lower.includes("audio/webm") || lower.includes("video/webm")) return "webm";
+    if (lower.includes("audio/ogg") || lower.includes("application/ogg") || lower.includes("opus")) return "ogg";
+    if (lower.includes("audio/mpeg")) return "mp3";
+    if (lower.includes("audio/wav")) return "wav";
+    if (lower.includes("audio/flac")) return "flac";
+	return "bin";
+};
 
-export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) {
-    const t = useCallback((key: string) => {
-        return dict?.common?.[key] || key;
-    }, [dict]);
+export function useSoundCloudDownloader() {
+    const t = useCallback((key: string) => COMMON_DICT[key] || key, []);
 
-    const { setQueryParam, setOnlyQueryParams, getQueryParam } = useUrlState();
     const { clientId } = useClientId();
 
+    const { processAudio, isLoading: isFFmpegLoading } = useFFmpeg();
+
     // State
-    const [activeTab, setActiveTab] = useState(() => getQueryParam("tab") || "search");
+    const [activeTab, setActiveTab] = useState<"single" | "playlist">("single");
     const [tracks, setTracks] = useState<SearchResultItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [searchState, setSearchState] = useState({ hasMore: false, searchQuery: "" });
-    const [page, setPage] = useState(1);
     const [downloadProgress, setDownloadProgress] = useState<DownloadProgress[]>([]);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lastSearchQuery, setLastSearchQuery] = useState(() => getQueryParam("q") || "");
     const [previewItem, setPreviewItem] = useState<SearchResultItem | null>(null);
+
+    const [mp3QualityKbps, setMp3QualityKbps] = useState<Mp3QualityKbps>(320);
 
     const resultsRef = useRef<HTMLDivElement>(null);
 
-    const isAnyLoading = isLoading;
-
-    // Effects
-    useEffect(() => {
-        setTracks([]);
-        setError(null);
-        setIsLoading(false);
-        setDownloadProgress([]);
-        setIsDownloadingAll(false);
-        if (activeTab !== "search") {
-            setLastSearchQuery("");
-        }
-    }, [activeTab]);
-
-    useEffect(() => {
-        if (activeTab === "search") {
-            const query = getQueryParam("q");
-            if (query) {
-                setLastSearchQuery(query);
-            }
-        }
-    }, [activeTab, getQueryParam]);
+    const isAnyLoading = isLoading || isDownloadingAll || isFFmpegLoading;
 
     const handleNewResults = useCallback(() => {
         if (resultsRef.current && !isLoading) {
@@ -78,30 +64,28 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
     }, [isLoading]);
 
     useEffect(() => {
-        if (tracks.length > 0 && !searchState.hasMore) {
+        if (tracks.length > 0) {
             handleNewResults();
         }
-    }, [tracks.length, searchState.hasMore, handleNewResults]);
+    }, [tracks.length, handleNewResults]);
 
     // Handlers
     const handleTabChange = useCallback((value: string) => {
         if (!isAnyLoading) {
+            if (value !== "single" && value !== "playlist") return;
             setActiveTab(value);
             setTracks([]);
             setError(null);
             setIsLoading(false);
             setDownloadProgress([]);
             setIsDownloadingAll(false);
-            setLastSearchQuery("");
-            setSearchState({ hasMore: false, searchQuery: "" });
-            setPage(1);
-            setOnlyQueryParams({ tab: value });
+            setPreviewItem(null);
         }
-    }, [isAnyLoading, setOnlyQueryParams]);
+    }, [isAnyLoading]);
 
     const handleDownloadSingle = useCallback(async (item: SearchResultItem) => {
         if (item.kind !== "track") {
-            toast.error("Chỉ có thể tải xuống bài hát.");
+            toast.error("Only tracks can be downloaded.");
             return;
         }
 
@@ -118,12 +102,8 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
         toast.info(t("start_download_count").replace("{count}", item.title));
 
         try {
-            const finalUrl = item.url.includes("?")
-                ? `${item.url}&client_id=${clientId}`
-                : `${item.url}?client_id=${clientId}`;
-
             const response = await fetch(
-                getDownloadApiPath(finalUrl, item.title, clientId)
+                getDownloadApiPath(item.url, item.title, clientId)
             );
 
             if (!response.ok) {
@@ -155,7 +135,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
             }
 
             const reader = response.body.getReader();
-            const contentLength = response.headers.get('Content-Length');
+            const contentLength = response.headers.get("Content-Length");
             const totalLength = contentLength ? parseInt(contentLength, 10) : 0;
             let receivedLength = 0;
             const chunks: Uint8Array[] = [];
@@ -169,21 +149,60 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
 
                 if (totalLength) {
                     const progress = Math.round((receivedLength / totalLength) * 100);
+                    // Share 70% of progress for downloading, 30% for FFmpeg processing
                     setDownloadProgress((prev) =>
                         prev.map((p) =>
-                            p.id === item.id ? { ...p, progress } : p
+                            p.id === item.id ? { ...p, progress: Math.round(progress * 0.7) } : p
                         )
                     );
                 }
             }
 
-            const blob = new Blob(chunks as any, { type: 'audio/mpeg' });
-            const url = window.URL.createObjectURL(blob);
+            const upstreamContentType =
+              response.headers.get("content-type") || "application/octet-stream";
+            const rawExt = mimeToFileExtension(upstreamContentType);
+
+            const mergedBytes = new Uint8Array(receivedLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+              mergedBytes.set(chunk, offset);
+              offset += chunk.length;
+            }
+
+            const rawBlob = new Blob([mergedBytes], { type: upstreamContentType });
+
+            // --- FFmpeg Client Side Processing (required) ---
+            let finalBlob: Blob;
+            const finalExt: string = "mp3";
+            try {
+                toast.info(`${t("processing_ffmpeg")}: "${item.title}"`);
+                const itemMetadata = {
+                    title: item.title,
+                    artist: item.artist,
+                    album: "SoundCloud",
+                } as const;
+
+                finalBlob = await processAudio(rawBlob, {
+                    ...itemMetadata,
+                    format: "mp3",
+                    mp3BitrateKbps: mp3QualityKbps,
+                });
+                setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, progress: 100 } : p));
+            } catch (ffmpegErr) {
+                console.warn("FFmpeg processing failed", ffmpegErr);
+                const message =
+                    ffmpegErr instanceof Error ? ffmpegErr.message : "Unknown error";
+                toast.error(`FFmpeg conversion failed: "${item.title}" (${message})`);
+                setDownloadProgress(prev => prev.map(p => p.id === item.id ? { ...p, status: "error" } : p));
+                return;
+            }
+
+            const url = window.URL.createObjectURL(finalBlob);
             const a = document.createElement('a');
             const uniqueId = `download-${item.id}-${Date.now()}`;
             a.id = uniqueId;
             a.href = url;
-            a.download = `${item.title}.mp3`;
+            a.download = `${item.title}.${finalExt}`;
             document.body.appendChild(a);
             a.click();
 
@@ -206,7 +225,7 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
                 )
             );
         }
-    }, [clientId, t]);
+    }, [clientId, t, processAudio, mp3QualityKbps]);
 
     const handleDownloadAll = useCallback(async () => {
         if (tracks.length === 0) {
@@ -255,52 +274,36 @@ export function useSoundCloudDownloader({ dict }: UseSoundCloudDownloaderProps) 
         }
     }, [previewItem, clientId, t]);
 
-    const handleLoadMore = useCallback(() => {
-        setPage(p => p + 1);
-    }, []);
-
     const handleRetry = useCallback(() => {
         setError(null);
     }, []);
-
-    const handleClearSearch = useCallback(() => {
-        if (activeTab === "search") {
-            setLastSearchQuery("");
-        }
-    }, [activeTab]);
 
     return {
         state: {
             activeTab,
             tracks,
             isLoading,
-            searchState,
-            page,
             downloadProgress,
             isDownloadingAll,
             error,
-            lastSearchQuery,
             previewItem,
             isAnyLoading,
             clientId,
-            resultsRef
+            resultsRef,
+            mp3QualityKbps,
         },
         actions: {
             setActiveTab: handleTabChange,
             setTracks,
             setIsLoading,
             setError,
-            setSearchState,
-            setPage,
-            setLastSearchQuery,
             handleDownloadSingle,
             handleDownloadAll,
             handlePreview,
             setPreviewItem,
             getProgressForTrack,
-            handleLoadMore,
             handleRetry,
-            handleClearSearch
+            setMp3QualityKbps,
         }
     };
 }

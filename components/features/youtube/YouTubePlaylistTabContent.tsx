@@ -3,14 +3,18 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { YouTubeItem } from "./types";
 import { ActionInputBar } from "@/components/common";
-import { useUrlState } from "@/lib/use-url-state";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
 
 interface YouTubePlaylistTabContentProps {
     setItems: (items: YouTubeItem[]) => void;
     setIsLoading: (isLoading: boolean) => void;
     setError: (error: string | null) => void;
     isLoading: boolean;
-    dict?: { common?: { [key: string]: string } };
+    hideInput?: boolean;
+    externalQuery?: string;
 }
 
 export function YouTubePlaylistTabContent({
@@ -18,21 +22,25 @@ export function YouTubePlaylistTabContent({
     setIsLoading,
     setError,
     isLoading,
-    dict,
+    hideInput,
+    externalQuery,
 }: YouTubePlaylistTabContentProps) {
-    const t = (key: string) => {
-        return dict?.common?.[key] || key;
-    };
-    const { setQueryParam, getQueryParam } = useUrlState();
-    const [url, setUrl] = useState(() => getQueryParam("yt_playlist_url") || "");
+    const t = React.useCallback((key: string) => COMMON_DICT[key] || key, []);
+    const [url, setUrl] = useState("");
+    const lastFetchedUrlRef = React.useRef("");
 
+    // Sync external query
     useEffect(() => {
-        setQueryParam("yt_playlist_url", url);
-    }, [url, setQueryParam]);
+        if (typeof externalQuery === 'string') {
+            setUrl(externalQuery);
+        }
+    }, [externalQuery]);
 
-    const handleFetch = async () => {
-        if (!url.trim()) {
-            toast.error(t("enter_keyword"));
+    const handleFetch = React.useCallback(async (overrideUrl?: string) => {
+        const urlToUse = (overrideUrl || url || "").trim();
+
+        if (!urlToUse) {
+            if (!hideInput) toast.error(t("enter_keyword"));
             return;
         }
 
@@ -44,49 +52,84 @@ export function YouTubePlaylistTabContent({
             const res = await fetch("/api/youtube/info", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, type: "playlist" }),
+                body: JSON.stringify({ url: urlToUse, type: "playlist" }),
             });
 
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || "Failed to fetch playlist");
-            }
-
-            const data = await res.json();
-            const entries = data.entries || [];
-            const mappedItems: YouTubeItem[] = entries.map((entry: any) => ({
-                id: entry.id,
-                title: entry.title,
-                thumbnail: entry.thumbnails?.[0]?.url || "",
-                duration: entry.duration,
-                uploader: entry.uploader,
-                url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
-                kind: "video"
-            }));
+	            }
+	
+	            const data = await res.json();
+	            const entries = Array.isArray(data.entries) ? data.entries : [];
+	            const mappedItems: YouTubeItem[] = entries
+	                .filter((entry: any) => {
+	                    const title = typeof entry?.title === "string" ? entry.title.trim() : "";
+	                    const availability =
+	                        typeof entry?.availability === "string"
+	                            ? entry.availability.toLowerCase()
+	                            : "";
+	                    if (!entry?.id || !title) return false;
+	                    if (
+	                        /^\[(private|deleted|unavailable) video\]$/i.test(title) ||
+	                        /^(private|deleted|unavailable) video$/i.test(title)
+	                    ) {
+	                        return false;
+	                    }
+	                    if (
+	                        availability &&
+	                        (availability.includes("private") ||
+	                            availability.includes("deleted") ||
+	                            availability.includes("unavailable"))
+	                    ) {
+	                        return false;
+	                    }
+	                    return true;
+	                })
+	                .map((entry: any) => ({
+	                    id: entry.id,
+	                    title: entry.title,
+	                    thumbnail: entry.thumbnails?.[0]?.url || "",
+	                    duration: entry.duration,
+	                    uploader: entry.uploader,
+	                    url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
+	                    kind: "video",
+	                }));
 
             setItems(mappedItems);
-            toast.success(`${t("results_found")}: ${mappedItems.length}`);
+            if (!hideInput) toast.success(`${t("results_found")}: ${mappedItems.length}`);
 
 
         } catch (err: any) {
             console.error(err);
             setError(err.message || t("error"));
-            toast.error(t("error"));
+            if (!hideInput) toast.error(t("error"));
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [url, hideInput, t, setError, setIsLoading, setItems]);
+
+    useEffect(() => {
+        if (!hideInput) return;
+        const urlToUse = externalQuery?.trim();
+        if (!urlToUse) return;
+        if (urlToUse === lastFetchedUrlRef.current) return;
+        lastFetchedUrlRef.current = urlToUse;
+        void handleFetch(urlToUse);
+    }, [hideInput, externalQuery, handleFetch]);
+
+    if (hideInput) return null;
 
     return (
         <ActionInputBar
-            label="URL Playlist YouTube:"
-            placeholder="https://www.youtube.com/playlist?list=..."
+            label={t("yt_playlist_label")}
+            placeholder={t("yt_playlist_placeholder")}
             value={url}
             onChange={setUrl}
-            onSubmit={handleFetch}
+            onSubmit={() => handleFetch()}
             disabled={isLoading}
             isLoading={isLoading}
-            buttonText={t("search_btn")}
+            buttonText={t("get_playlist")}
             loadingText={t("searching")}
         />
     );

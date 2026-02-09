@@ -1,55 +1,19 @@
+import "server-only";
+
 import {
   Soundcloud,
   SoundcloudPlaylist,
   SoundcloudTrack,
-  SoundcloudTrackSearch,
 } from "soundcloud.ts";
-import ky from "ky";
-import { getClientIdApiPath } from "./get-api-endpoint";
+import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
 
 const soundcloudInstance = async () => {
-  const clientId = await getClientId();
+  const clientId = await getSoundCloudClientId();
   console.log("[soundcloudInstance] Fetched SoundCloud Client ID:", clientId);
   if (!clientId) {
     throw new Error("Client ID not found");
   }
   return new Soundcloud(clientId);
-};
-
-const getClientId = async (): Promise<string | null> => {
-  const clientIdRes = await ky
-    .get<{ clientId: string; error?: string }>(getClientIdApiPath())
-    .json();
-  const { clientId, error } = clientIdRes;
-  if (error) {
-    console.error("Error fetching client ID:", error);
-    return null;
-  }
-  return clientId;
-};
-
-export const searchSoundCloud = async (
-  query: string,
-  limit: number = 10
-): Promise<SoundcloudTrackSearch | null> => {
-  const sc = await soundcloudInstance();
-
-  try {
-    const response = await sc.tracks.search({
-      q: query,
-      limit,
-    });
-    console.log("[searchSoundCloud] Search response:", response);
-
-    if (!response) {
-      console.error(`SoundCloud search API error: ${response}`);
-      return null;
-    }
-    return response;
-  } catch (error) {
-    console.error("Error searching SoundCloud:", error);
-    return null;
-  }
 };
 
 export const getSoundCloudSong = async (

@@ -146,6 +146,8 @@ export async function GET(req: NextRequest) {
       ext = "wav";
     }
     // Generate filename - use track title with detected extension
+    const asciiFilename = title.replace(/[^\x20-\x7E]/g, '_');
+    const encodedFilename = encodeURIComponent(title);
     const baseFilename = `${title}.${ext}`;
 
     // Set up response headers for file download
@@ -153,9 +155,10 @@ export async function GET(req: NextRequest) {
     // Forward upstream content-type when possible to avoid mislabeling non-audio responses
     headers.set("Content-Type", upstreamContentType);
     const isPreview = searchParams.get("preview") === "true";
+    const dispositionType = isPreview ? 'inline' : 'attachment';
     headers.set(
       "Content-Disposition",
-      `${isPreview ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(baseFilename)}`
+      `${dispositionType}; filename="${asciiFilename}.${ext}"; filename*=UTF-8''${encodedFilename}.${ext}`
     );
     headers.set("Cache-Control", "no-cache");
 

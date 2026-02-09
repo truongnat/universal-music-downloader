@@ -4,9 +4,12 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { SearchResultItem } from "./types";
-import { getClientIdApiPath, getPlaylistApiPath } from "@/lib/get-api-endpoint";
-import { useUrlState } from "@/lib/use-url-state";
+import { getPlaylistApiPath } from "@/lib/get-api-endpoint";
 import { ActionInputBar } from "@/components/common";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
 
 interface PlaylistTabContentProps {
   setTracks: (tracks: SearchResultItem[]) => void;
@@ -15,6 +18,8 @@ interface PlaylistTabContentProps {
   isLoading: boolean;
   isAnyLoading: boolean;
   clientId: string | null;
+  hideInput?: boolean;
+  externalQuery?: string;
 }
 
 export function PlaylistTabContent({
@@ -24,57 +29,39 @@ export function PlaylistTabContent({
   isLoading,
   isAnyLoading,
   clientId,
+  hideInput,
+  externalQuery,
 }: PlaylistTabContentProps) {
-  const { setQueryParam, getQueryParam } = useUrlState();
-  const [url, setUrl] = useState(() => getQueryParam("sc_playlist_url") || "");
+  const t = React.useCallback((key: string) => COMMON_DICT[key] || key, []);
+  const [url, setUrl] = useState("");
+  const lastFetchedUrlRef = React.useRef<string>("");
 
-  // Sync URL state to query param
+  // Sync external query
   React.useEffect(() => {
-    setQueryParam("sc_playlist_url", url);
-  }, [url, setQueryParam]);
-
-  // Auto-load when there's a URL in the query params
-  React.useEffect(() => {
-    const urlFromQuery = getQueryParam("sc_playlist_url");
-    if (urlFromQuery && clientId) {
-      // If we have a URL, we might want to trigger the fetch automatically
-      // But we need to be careful not to trigger it if it's just being typed
-      // For now, let's just ensure the input is populated (handled by useState)
-      // and maybe trigger if it's the initial load?
-      // The original code had logic to call handleUrlSubmit.
-      // Let's keep it but use the new param name.
-      handleUrlSubmit(urlFromQuery);
+    if (typeof externalQuery === 'string') {
+      setUrl(externalQuery);
     }
-  }, [clientId]);
+  }, [externalQuery]);
 
-  const handleUrlSubmit = async (submittedUrl?: string) => {
+  const handleUrlSubmit = React.useCallback(async (submittedUrl?: string) => {
     const urlToUse = submittedUrl || url;
     if (!urlToUse.trim()) {
-      toast.error("Vui lòng nhập URL SoundCloud");
+      if (!hideInput) toast.error(t("enter_keyword"));
       return;
     }
 
     if (!clientId) {
-      // If clientId is not available, we cannot proceed.
-      // This case should ideally be handled by the parent component providing clientId.
-      setError("Client ID không có sẵn. Vui lòng thử lại sau.");
-      toast.error("Client ID không có sẵn");
+      setError(t("client_id_missing"));
+      if (!hideInput) toast.error(t("client_id_missing"));
       return;
     }
 
     setIsLoading(true);
-    // setQueryParam("url", urlToUse); // Removed old param setting
     setError(null);
 
     try {
-      // Removed internal client ID fetch
-
-      let finalUrl = urlToUse.includes("?")
-        ? `${urlToUse}&client_id=${clientId}`
-        : `${urlToUse}?client_id=${clientId}`;
-
       const response = await fetch(
-        getPlaylistApiPath(finalUrl)
+        getPlaylistApiPath(urlToUse)
       );
       const data = await response.json();
       const newResults: SearchResultItem[] = data.tracks.map((track: any) => ({
@@ -82,33 +69,42 @@ export function PlaylistTabContent({
         kind: "track",
         title: track.title,
         artist: track.user.username,
-        duration: new Date(track.duration).toISOString().substr(14, 5),
+        duration: Math.round((track.duration || 0) / 1000),
         thumbnail: track.artwork_url,
         url: track.permalink_url,
       }));
       setTracks(newResults);
-      toast.success(`Đã tìm thấy ${newResults.length} bài hát trong playlist`);
+      if (!hideInput) toast.success(`${t("results_found")}: ${newResults.length}`);
     } catch (error) {
-      setError("Đã xảy ra lỗi khi tải dữ liệu. Vui lòng kiểm tra URL và thử lại.");
-      toast.error("Không thể tải dữ liệu từ URL này");
+      setError(t("error_download"));
+      if (!hideInput) toast.error(t("error_download"));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [url, hideInput, t, clientId, setIsLoading, setError, setTracks]);
 
+  React.useEffect(() => {
+    if (!hideInput) return;
+    const urlToUse = externalQuery?.trim();
+    if (!urlToUse || !clientId) return;
+    if (urlToUse === lastFetchedUrlRef.current) return;
+    lastFetchedUrlRef.current = urlToUse;
+    handleUrlSubmit(urlToUse);
+  }, [hideInput, externalQuery, clientId, handleUrlSubmit]);
 
+  if (hideInput) return null;
 
   return (
     <ActionInputBar
-      label="URL SoundCloud của playlist:"
-      placeholder="https://soundcloud.com/user/sets/playlist-name"
+      label={t("sc_playlist_label") || "SoundCloud Playlist URL:"}
+      placeholder={t("sc_playlist_placeholder") || "https://soundcloud.com/user/sets/playlist-name"}
       value={url}
       onChange={setUrl}
       onSubmit={() => handleUrlSubmit()}
       disabled={isAnyLoading}
       isLoading={isLoading}
-      buttonText="Lấy playlist"
-      loadingText="Đang tải..."
+      buttonText={t("get_playlist") || "Get Playlist"}
+      loadingText={t("downloading")}
     />
   );
 }

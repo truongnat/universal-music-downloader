@@ -4,9 +4,12 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { SearchResultItem } from "./types";
-import { getClientIdApiPath, getSongAPiPath } from "@/lib/get-api-endpoint";
-import { useUrlState } from "@/lib/use-url-state";
+import { getSongAPiPath } from "@/lib/get-api-endpoint";
 import { ActionInputBar } from "@/components/common";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
 
 interface SingleTrackTabContentProps {
   setTracks: (tracks: SearchResultItem[]) => void;
@@ -15,6 +18,8 @@ interface SingleTrackTabContentProps {
   isLoading: boolean;
   isAnyLoading: boolean;
   clientId: string | null;
+  hideInput?: boolean;
+  externalQuery?: string;
 }
 
 export function SingleTrackTabContent({
@@ -24,27 +29,24 @@ export function SingleTrackTabContent({
   isLoading,
   isAnyLoading,
   clientId,
+  hideInput,
+  externalQuery,
 }: SingleTrackTabContentProps) {
-  const { setQueryParam, getQueryParam } = useUrlState();
-  const [url, setUrl] = useState(() => getQueryParam("sc_track_url") || "");
+  const t = React.useCallback((key: string) => COMMON_DICT[key] || key, []);
+  const [url, setUrl] = useState("");
+  const lastFetchedUrlRef = React.useRef<string>("");
 
-  // Sync URL state to query param
+  // Sync external query
   React.useEffect(() => {
-    setQueryParam("sc_track_url", url);
-  }, [url, setQueryParam]);
-
-  // Auto-load when there's a URL in the query params
-  React.useEffect(() => {
-    const urlFromQuery = getQueryParam("sc_track_url");
-    if (urlFromQuery && clientId) {
-      handleUrlSubmit(urlFromQuery);
+    if (typeof externalQuery === 'string') {
+      setUrl(externalQuery);
     }
-  }, [clientId]);
+  }, [externalQuery]);
 
-  const handleUrlSubmit = async (submittedUrl?: string) => {
-    const urlToUse = submittedUrl || url;
+  const handleUrlSubmit = React.useCallback(async (submittedUrl?: string) => {
+    const urlToUse = (submittedUrl || url).trim();
     if (!urlToUse.trim()) {
-      toast.error("Vui lòng nhập URL SoundCloud");
+      if (!hideInput) toast.error(t("enter_keyword"));
       return;
     }
 
@@ -57,13 +59,7 @@ export function SingleTrackTabContent({
     setError(null);
 
     try {
-      // Removed internal client ID fetch
-
-      let finalUrl = url.includes("?")
-        ? `${url}&client_id=${clientId}`
-        : `${url}?client_id=${clientId}`;
-
-      const response = await fetch(getSongAPiPath(finalUrl));
+      const response = await fetch(getSongAPiPath(urlToUse));
       const track = await response.json();
       const newTrack: SearchResultItem = {
         id: String(track.id),
@@ -78,28 +74,38 @@ export function SingleTrackTabContent({
         artworkUrl: track.artwork_url,
       };
       setTracks([newTrack]);
-      toast.success("Đã tìm thấy bài hát");
+      if (!hideInput) toast.success(t("results_found"));
     } catch (error) {
-      setError("Đã xảy ra lỗi khi tải dữ liệu. Vui lòng kiểm tra URL và thử lại.");
-      toast.error("Không thể tải dữ liệu từ URL này");
+      setError(t("error_download"));
+      if (!hideInput) toast.error(t("error_download"));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [url, hideInput, t, clientId, setIsLoading, setError, setTracks]);
+
+  React.useEffect(() => {
+    if (!hideInput) return;
+    const urlToUse = externalQuery?.trim();
+    if (!urlToUse || !clientId) return;
+    if (urlToUse === lastFetchedUrlRef.current) return;
+    lastFetchedUrlRef.current = urlToUse;
+    handleUrlSubmit(urlToUse);
+  }, [hideInput, externalQuery, clientId, handleUrlSubmit]);
 
 
+  if (hideInput) return null;
 
   return (
     <ActionInputBar
-      label="URL SoundCloud của bài hát:"
-      placeholder="https://soundcloud.com/user/track-name"
+      label={t("sc_single_label") || "SoundCloud Track URL:"}
+      placeholder={t("sc_single_placeholder") || "https://soundcloud.com/user/track-name"}
       value={url}
       onChange={setUrl}
       onSubmit={() => handleUrlSubmit()}
       disabled={isAnyLoading}
       isLoading={isLoading}
-      buttonText="Lấy bài hát"
-      loadingText="Đang tải..."
+      buttonText={t("get_track") || "Get Track"}
+      loadingText={t("downloading")}
     />
   );
 }

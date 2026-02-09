@@ -88,10 +88,10 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
-  // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen, setOpenMobile]);
+	  // Helper to toggle the sidebar.
+	  const toggleSidebar = React.useCallback(() => {
+	    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+	  }, [isMobile, setOpen]);
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -113,18 +113,18 @@ function SidebarProvider({
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
 
-  const contextValue = React.useMemo<SidebarContextProps>(
-    () => ({
-      state,
-      open,
-      setOpen,
-      isMobile,
-      openMobile,
-      setOpenMobile,
-      toggleSidebar,
-    }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
-  );
+	  const contextValue = React.useMemo<SidebarContextProps>(
+	    () => ({
+	      state,
+	      open,
+	      setOpen,
+	      isMobile,
+	      openMobile,
+	      setOpenMobile,
+	      toggleSidebar,
+	    }),
+	    [state, open, setOpen, isMobile, openMobile, toggleSidebar],
+	  );
 
   return (
     <SidebarContext.Provider value={contextValue}>

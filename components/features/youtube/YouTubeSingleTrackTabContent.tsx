@@ -3,14 +3,18 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { YouTubeItem } from "./types";
 import { ActionInputBar } from "@/components/common";
-import { useUrlState } from "@/lib/use-url-state";
+import dictionary from "@/lib/dictionary.json";
+
+const COMMON_DICT =
+  (dictionary as unknown as { common?: Record<string, string> }).common ?? {};
 
 interface YouTubeSingleTrackTabContentProps {
     setItems: (items: YouTubeItem[]) => void;
     setIsLoading: (isLoading: boolean) => void;
     setError: (error: string | null) => void;
     isLoading: boolean;
-    dict?: { common?: { [key: string]: string } };
+    hideInput?: boolean;
+    externalQuery?: string;
 }
 
 export function YouTubeSingleTrackTabContent({
@@ -18,21 +22,25 @@ export function YouTubeSingleTrackTabContent({
     setIsLoading,
     setError,
     isLoading,
-    dict,
+    hideInput,
+    externalQuery,
 }: YouTubeSingleTrackTabContentProps) {
-    const t = (key: string) => {
-        return dict?.common?.[key] || key;
-    };
-    const { setQueryParam, getQueryParam } = useUrlState();
-    const [url, setUrl] = useState(() => getQueryParam("yt_video_url") || "");
+    const t = React.useCallback((key: string) => COMMON_DICT[key] || key, []);
+    const [url, setUrl] = useState("");
+    const lastFetchedUrlRef = React.useRef("");
 
+    // Sync external query
     useEffect(() => {
-        setQueryParam("yt_video_url", url);
-    }, [url, setQueryParam]);
+        if (typeof externalQuery === 'string') {
+            setUrl(externalQuery);
+        }
+    }, [externalQuery]);
 
-    const handleFetch = async () => {
-        if (!url.trim()) {
-            toast.error(t("enter_keyword"));
+    const handleFetch = React.useCallback(async (overrideUrl?: string) => {
+        const urlToUse = (overrideUrl || url || "").trim();
+
+        if (!urlToUse) {
+            if (!hideInput) toast.error(t("enter_keyword"));
             return;
         }
 
@@ -44,7 +52,7 @@ export function YouTubeSingleTrackTabContent({
             const res = await fetch("/api/youtube/info", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, type: "video" }),
+                body: JSON.stringify({ url: urlToUse, type: "video" }),
             });
 
             if (!res.ok) {
@@ -59,31 +67,42 @@ export function YouTubeSingleTrackTabContent({
                 thumbnail: data.thumbnail,
                 duration: data.duration,
                 uploader: data.uploader,
-                url: data.webpage_url || url,
+                url: data.webpage_url || urlToUse,
                 kind: "video"
             };
             setItems([item]);
-            toast.success(t("results_found"));
+            if (!hideInput) toast.success(t("results_found"));
 
         } catch (err: any) {
             console.error(err);
             setError(err.message || t("error"));
-            toast.error(t("error"));
+            if (!hideInput) toast.error(t("error"));
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [url, hideInput, t, setError, setIsLoading, setItems]);
+
+    useEffect(() => {
+        if (!hideInput) return;
+        const urlToUse = externalQuery?.trim();
+        if (!urlToUse) return;
+        if (urlToUse === lastFetchedUrlRef.current) return;
+        lastFetchedUrlRef.current = urlToUse;
+        void handleFetch(urlToUse);
+    }, [hideInput, externalQuery, handleFetch]);
+
+    if (hideInput) return null;
 
     return (
         <ActionInputBar
-            label="URL Video YouTube:"
-            placeholder="https://www.youtube.com/watch?v=..."
+            label={t("yt_single_label")}
+            placeholder={t("yt_single_placeholder")}
             value={url}
             onChange={setUrl}
-            onSubmit={handleFetch}
+            onSubmit={() => handleFetch()}
             disabled={isLoading}
             isLoading={isLoading}
-            buttonText={t("search_btn")}
+            buttonText={t("get_track")}
             loadingText={t("searching")}
         />
     );

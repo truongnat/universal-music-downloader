@@ -9,16 +9,15 @@ interface HeroSectionProps {
 
 export function HeroSection({ title, description }: HeroSectionProps) {
     return (
-        <section className="relative py-20 px-4 overflow-hidden">
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
-
-            <div className="max-w-5xl mx-auto text-center space-y-6">
+        <section className="relative pt-20 sm:pt-24 pb-6 px-4 overflow-hidden">
+            <div className="max-w-4xl mx-auto text-center space-y-4 relative">
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
+                    transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col items-center"
                 >
-                    <h1 className="text-4xl md:text-6xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600 dark:to-purple-400">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight text-foreground">
                         {title}
                     </h1>
                 </motion.div>
@@ -26,8 +25,8 @@ export function HeroSection({ title, description }: HeroSectionProps) {
                 <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className="text-xl text-muted-foreground max-w-2xl mx-auto"
+                    transition={{ duration: 0.8, delay: 0.3 }}
+                    className="text-sm sm:text-base text-foreground/50 max-w-xl mx-auto leading-relaxed font-medium"
                 >
                     {description}
                 </motion.p>

@@ -1,22 +1,11 @@
 import { baseUrl } from "./get-base-url";
 
 export const buildApiEndpoint = (path: string) => {
+  // In the browser, prefer relative URLs (avoid relying on NEXT_PUBLIC_BASE_URL).
+  // On the server, keep absolute URLs when needed.
+  if (typeof window !== "undefined") return path;
   return `${baseUrl}${path}`;
 };
-
-export const getSearchApiPath = (
-  query: string,
-  clientId: string,
-  offset: number = 0,
-  limit: number = 10
-) => {
-  return buildApiEndpoint(
-    `/api/soundcloud/search?q=${encodeURIComponent(
-      query
-    )}&limit=${limit}&offset=${offset}&client_id=${clientId}`
-  );
-};
-
 export const getClientIdApiPath = () => {
   return buildApiEndpoint("/api/soundcloud/get-client-id");
 };

@@ -4,10 +4,19 @@ import { getSoundCloudSong } from '@/lib/soundcloud-api';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const url = searchParams.get('url');
+  const rawUrl = searchParams.get('url');
 
-  if (!url) {
+  if (!rawUrl) {
     return NextResponse.json({ error: 'Query parameter "url" is required' }, { status: 400 });
+  }
+
+  const url = rawUrl.trim();
+
+  // Basic validation to prevent playlist URLs in song endpoint
+  if (url.includes("/sets/")) {
+    return NextResponse.json({
+      error: "Detected a playlist URL. Please use the Playlist tab to download sets/playlists."
+    }, { status: 400 });
   }
 
   try {

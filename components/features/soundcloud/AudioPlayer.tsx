@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, X, Volume2, VolumeX, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 interface AudioPlayerProps {
     src: string;
@@ -10,9 +11,10 @@ interface AudioPlayerProps {
     thumbnail?: string;
     onClose: () => void;
     autoPlay?: boolean;
+    disableSeek?: boolean;
 }
 
-export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay = true }: AudioPlayerProps) {
+export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay = true, disableSeek = false }: AudioPlayerProps) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
@@ -96,6 +98,7 @@ export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay =
     };
 
     const handleSeek = (value: number[]) => {
+        if (disableSeek) return;
         setSliderValue(value[0]);
         // Optional: seeking while dragging (scrubbing)
         // const audio = audioRef.current;
@@ -103,6 +106,7 @@ export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay =
     };
 
     const handleSeekCommit = (value: number[]) => {
+        if (disableSeek) return;
         const audio = audioRef.current;
         if (audio) {
             audio.currentTime = value[0];
@@ -112,6 +116,7 @@ export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay =
     };
 
     const handleSeekStart = () => {
+        if (disableSeek) return;
         setIsDragging(true);
     };
 
@@ -135,8 +140,13 @@ export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay =
                 {/* Thumbnail & Info */}
                 <div className="flex items-center gap-3 w-48 sm:w-64">
                     {thumbnail ? (
-                        <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
-                            <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
+                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-foreground/5 border border-border relative">
+                            <Image
+                                src={thumbnail}
+                                alt={title}
+                                fill
+                                className="object-cover"
+                            />
                         </div>
                     ) : (
                         <div className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0">
@@ -176,7 +186,8 @@ export function AudioPlayer({ src, title, artist, thumbnail, onClose, autoPlay =
                             step={1}
                             onValueChange={handleSeek}
                             onValueCommit={handleSeekCommit}
-                            className="flex-1 cursor-pointer"
+                            disabled={disableSeek}
+                            className={`flex-1 ${disableSeek ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             onPointerDown={handleSeekStart}
                         />
                         <span className="w-10 tabular-nums">{formatTime(duration)}</span>
