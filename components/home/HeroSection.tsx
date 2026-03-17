@@ -1,7 +1,3 @@
-'use client';
-
-import { motion } from "motion/react";
-
 interface HeroSectionProps {
     title: string;
     description: string;
@@ -9,27 +5,18 @@ interface HeroSectionProps {
 
 export function HeroSection({ title, description }: HeroSectionProps) {
     return (
-        <section className="relative pt-20 sm:pt-24 pb-6 px-4 overflow-hidden">
-            <div className="max-w-4xl mx-auto text-center space-y-4 relative">
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col items-center"
-                >
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight text-foreground">
-                        {title}
-                    </h1>
-                </motion.div>
-
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.3 }}
-                    className="text-sm sm:text-base text-foreground/50 max-w-xl mx-auto leading-relaxed font-medium"
-                >
+        <section className="pt-24 pb-8 px-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-muted/50 text-xs text-muted-foreground font-mono">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                    SoundCloud + YouTube
+                </div>
+                <h1 className="font-mono text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+                    {title}
+                </h1>
+                <p className="text-muted-foreground max-w-xl leading-relaxed">
                     {description}
-                </motion.p>
+                </p>
             </div>
         </section>
     );
