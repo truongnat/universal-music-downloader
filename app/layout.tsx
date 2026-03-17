@@ -10,7 +10,7 @@ import dictionary from "@/lib/dictionary.json";
 import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
 
 // --- Constants & Types ---
-const BASE_URL = "https://universal-music-downloader.vercel.app";
+const BASE_URL = "https://universal-music-downloader-truongdqdev-9126s-projects.vercel.app";
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
