@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-    // Next.js 15: Enable React 19 Compiler
-    experimental: {
-        // reactCompiler: true, // Optional: Enable if dependencies are compatible
-    },
+    experimental: {},
     images: {
         remotePatterns: [
             { protocol: 'https', hostname: 'i.ytimg.com' },
@@ -20,27 +17,29 @@ const nextConfig: NextConfig = {
             {
                 source: '/(.*)',
                 headers: [
-                    {
-                        key: 'Cross-Origin-Opener-Policy',
-                        value: 'same-origin',
-                    },
-                    {
-                        key: 'Cross-Origin-Embedder-Policy',
-                        value: 'require-corp',
-                    },
+                    { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+                    { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
                 ],
             },
         ];
     },
     logging: {
-        fetches: {
-            fullUrl: true,
-        },
+        fetches: { fullUrl: true },
     },
-    // Next.js 15: Better handling of static generation
     typescript: {
         ignoreBuildErrors: false,
-    }
+    },
+    webpack: (config, { isServer }) => {
+        if (isServer) {
+            // Externalize native/binary packages that can't be bundled
+            config.externals = [
+                ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+                'ffmpeg-static',
+                'fluent-ffmpeg',
+            ]
+        }
+        return config
+    },
 };
 
 export default nextConfig;
