@@ -99,7 +99,7 @@ export default async function RootLayout({
         <ClientIdProvider initialClientId={initialClientId}>
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
+            defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
