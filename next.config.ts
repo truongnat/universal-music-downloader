@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
     experimental: {},
@@ -29,14 +30,13 @@ const nextConfig: NextConfig = {
     typescript: {
         ignoreBuildErrors: false,
     },
-    webpack: (config, { isServer }) => {
-        if (isServer) {
-            // Externalize native/binary packages that can't be bundled
-            config.externals = [
-                ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
-                'ffmpeg-static',
-                'fluent-ffmpeg',
-            ]
+    webpack: (config) => {
+        // soundcloud.ts imports ffmpeg-static at module level.
+        // We use ffmpeg-wasm (client-side) instead — stub it out entirely.
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            'ffmpeg-static': path.resolve('./lib/ffmpeg-static-stub.js'),
+            'fluent-ffmpeg': path.resolve('./lib/ffmpeg-static-stub.js'),
         }
         return config
     },
