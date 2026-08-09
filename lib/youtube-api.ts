@@ -43,7 +43,7 @@ export const commonYtDlpArgs = [
     "--js-runtime", "node",
     "--prefer-free-formats",
     "--no-warnings",
-    "--extractor-args", "youtube:player_client=android,web",
+    "--extractor-args", "youtube:player_client=web,android_vr,tv_downgraded",
     "--cookies", "/app/cookies.txt"
 ];
 
