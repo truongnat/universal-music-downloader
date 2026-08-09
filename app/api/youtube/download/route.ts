@@ -41,9 +41,9 @@ export async function GET(req: NextRequest) {
 	            "--no-playlist",
 	            "-o",
 	            "-",
-	            // Prefer audio-only formats that don't require server-side ffmpeg/merging.
+	            // Prefer audio-only formats, fallback to best overall if audio-only is missing for some reason
 	            "-f",
-	            "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=ogg]/bestaudio",
+	            "bestaudio[ext=m4a]/bestaudio/best",
 	        ];
 	        args.push(...commonYtDlpArgs);
 
