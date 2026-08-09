@@ -38,12 +38,13 @@ export const initYtDlp = async () => {
     return new YtdlpWrap(binaryPath);
 };
 
-// Common arguments for robustness - Removed --ffmpeg-location to avoid server-side dependency
 export const commonYtDlpArgs = [
     "--no-check-certificates",
     "--js-runtime", "node",
     "--prefer-free-formats",
     "--no-warnings",
+    "--extractor-args", "youtube:player_client=android,web",
+    "--cookies", "/app/cookies.txt"
 ];
 
 export const formatYtDlpError = (error: any): string => {
