@@ -4,9 +4,12 @@ import "./globals.css";
 // Contexts & Components
 import { ClientIdProvider } from "@/contexts/ClientIdProvider";
 import { QualityProvider } from "@/contexts/QualityProvider";
+import { DownloadQueueProvider } from "@/contexts/DownloadQueueProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/common/Header";
 import { ScrollToTopButton } from "@/components/common/ScrollToTopButton";
+import { DownloadQueue } from "@/components/common/DownloadQueue";
+import { Toaster } from "sonner";
 import dictionary from "@/lib/dictionary.json";
 import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
 import { getBaseUrl } from "@/lib/get-base-url";
@@ -100,16 +103,20 @@ export default async function RootLayout({
       <body className="antialiased">
         <ClientIdProvider initialClientId={initialClientId}>
           <QualityProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <Header />
-              {children}
-              <ScrollToTopButton />
-            </ThemeProvider>
+            <DownloadQueueProvider>
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="system"
+                enableSystem
+                disableTransitionOnChange
+              >
+                <Toaster richColors position="top-right" />
+                <Header />
+                {children}
+                <ScrollToTopButton />
+                <DownloadQueue />
+              </ThemeProvider>
+            </DownloadQueueProvider>
           </QualityProvider>
         </ClientIdProvider>
       </body>

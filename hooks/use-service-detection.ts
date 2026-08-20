@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-export type ServiceType = "soundcloud" | "youtube" | "unknown";
+export type ServiceType = "soundcloud" | "youtube" | "tiktok" | "unknown";
 export type SearchMode = "single" | "playlist";
 
 export interface DetectionResult {
@@ -31,6 +31,8 @@ export function useServiceDetection(input: string): DetectionResult {
         service = "youtube";
       } else if (lowerInput.includes("soundcloud.com") || lowerInput.includes("on.soundcloud.com")) {
         service = "soundcloud";
+      } else if (lowerInput.includes("tiktok.com")) {
+        service = "tiktok";
       }
     }
 

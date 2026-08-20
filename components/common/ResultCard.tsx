@@ -16,6 +16,7 @@ import { motion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useDownloadQueue } from "@/contexts/DownloadQueueProvider";
 import dictionary from "@/lib/dictionary.json";
 
 interface MediaItem {
@@ -68,8 +69,11 @@ export const ResultCard = React.memo(function ResultCard({
   const dict = dictionary;
   const t = (key: string) => (dict as any)?.common?.[key] || key;
 
-  const isDownloading = progress?.status === "downloading";
-  const isCompleted = progress?.status === "completed";
+  const { addToQueue, getItem } = useDownloadQueue();
+  const queueItem = getItem(item.id);
+  const isDownloading = queueItem?.status === 'downloading';
+  const isCompleted = queueItem?.status === 'completed' || progress?.status === "completed";
+  const isQueued = queueItem?.status === 'queued';
   const isPlaying = activePreviewId === item.id;
   const canPreview = typeof onPreview === "function";
 
@@ -201,24 +205,42 @@ export const ResultCard = React.memo(function ResultCard({
         )}
 
         <Button
-          onClick={() => onDownload(item)}
-          disabled={isDownloading || isDownloadingAll}
+          onClick={() => {
+            if (!isDownloading && !isCompleted && !isQueued) {
+              addToQueue({
+                url: item.url,
+                title: item.title,
+                thumbnail: item.thumbnail,
+                artist: item.uploader || item.artist,
+                source,
+                format: 'mp3',
+              });
+            }
+          }}
+          disabled={isDownloading || isDownloadingAll || isQueued}
           className={cn(
             "h-10 px-5 rounded-xl font-medium text-sm transition-all duration-300 flex-1 sm:flex-none",
             isCompleted
-              ? "bg-muted text-foreground hover:bg-muted/80"
-              : "bg-gradient-to-r from-brand-orange to-brand-red text-white hover:shadow-md hover:shadow-brand-orange/20"
+              ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20"
+              : isQueued
+                ? "bg-muted text-foreground hover:bg-muted/80"
+                : "bg-gradient-to-r from-brand-orange to-brand-red text-white hover:shadow-md hover:shadow-brand-orange/20"
           )}
         >
           {isDownloading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="tabular-nums">{progress?.progress ?? 0}%</span>
+              <span className="tabular-nums">{queueItem?.progress ?? progress?.progress ?? 0}%</span>
             </div>
           ) : isCompleted ? (
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4" />
-              <span>{t("downloaded") || "Done"}</span>
+              <span>Done</span>
+            </div>
+          ) : isQueued ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4" />
+              <span>Queued</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">

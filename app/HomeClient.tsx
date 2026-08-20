@@ -11,6 +11,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { FeaturesSection } from "@/components/home/FeaturesSection";
 import { Footer } from "@/components/home/Footer";
 import { UnifiedControls } from "@/components/home/UnifiedControls";
+import { SearchBar } from "@/components/common/SearchBar";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import dictionary from "@/lib/dictionary.json";
 
@@ -135,7 +136,7 @@ export default function HomeClient() {
                 <section className="max-w-4xl mx-auto px-4 pb-16 relative z-10 -mt-4">
 
                     {/* Unified Controls */}
-                    <div className="mb-10">
+                    <div className="mb-6">
                         <UnifiedControls
                             inputValue={inputValue}
                             onInputChange={setInputValue}
@@ -143,6 +144,16 @@ export default function HomeClient() {
                             canSubmit={inputDetection.isValid}
                             isLoading={isLoading}
                         />
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="mb-8">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="h-px flex-1 bg-border" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">or search</span>
+                            <div className="h-px flex-1 bg-border" />
+                        </div>
+                        <SearchBar />
                     </div>
 
                     {/* Content Area - Show detected service when ready */}
