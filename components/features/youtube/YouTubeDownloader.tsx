@@ -22,14 +22,8 @@ import { AudioPlayer } from "../soundcloud/AudioPlayer";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { YouTubeItem } from "./types";
 import dictionary from "@/lib/dictionary.json";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useQuality } from "@/contexts/QualityProvider";
 
 interface YouTubeDownloaderProps {
     hideInput?: boolean;
@@ -39,9 +33,10 @@ interface YouTubeDownloaderProps {
     externalMp3QualityKbps?: 128 | 320;
 }
 
-export function YouTubeDownloader({ hideInput, hideControls, externalQuery, externalMode, externalMp3QualityKbps }: YouTubeDownloaderProps) {
+export function YouTubeDownloader({ hideInput, hideControls, externalQuery, externalMode }: YouTubeDownloaderProps) {
     const dict = dictionary;
     const { state, actions } = useYouTubeDownloader();
+    const { mp3QualityKbps } = useQuality();
     const t = (key: string) => (dict as any)?.common?.[key] || key;
 
     const effectiveTab = externalMode ?? state.activeTab;
@@ -51,12 +46,6 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
             actions.setActiveTab(externalMode);
         }
     }, [externalMode, state.activeTab, actions.setActiveTab]);
-
-    React.useEffect(() => {
-        if (externalMp3QualityKbps) {
-            actions.setMp3QualityKbps(externalMp3QualityKbps);
-        }
-    }, [externalMp3QualityKbps, actions.setMp3QualityKbps]);
 
     const tabContents = (
         <>
@@ -108,36 +97,25 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
     return (
         <div className="w-full max-w-4xl mx-auto p-2 space-y-4">
             {!hideControls && (
-                <Card className="backdrop-blur-sm">
+                <Card className="bg-card border-border">
                     <CardHeader>
                         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <CardTitle className="flex items-center gap-2">
-                                <Youtube className="w-6 h-6 text-red-500" />
+                            <CardTitle className="flex items-center gap-3 text-foreground">
+                                <div className="p-2 rounded-xl bg-brand-red/10">
+                                    <Youtube className="w-5 h-5 text-brand-red" />
+                                </div>
                                 <span>YouTube Downloader</span>
                             </CardTitle>
 
                             <div className="flex items-center gap-4">
-                                <div className="flex flex-col items-end gap-1">
-                                    <span className="text-xs text-muted-foreground font-medium">{(dict as any)?.common?.select_quality || "Quality"}</span>
-                                    <Select
-                                        value={state.mp3QualityKbps.toString()}
-                                        onValueChange={(v) => actions.setMp3QualityKbps((v === "128" ? 128 : 320) as 128 | 320)}
-                                    >
-                                        <SelectTrigger className="w-[100px] h-8 text-xs">
-                                            <SelectValue placeholder="320 kbps" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="128">128 kbps</SelectItem>
-                                            <SelectItem value="320">320 kbps</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <Badge variant={state.isAnyLoading ? "outline" : "secondary"} className="h-6">
+                                <Badge
+                                    variant={state.isAnyLoading ? "outline" : "secondary"}
+                                    className="h-7 px-3"
+                                >
                                     {state.isAnyLoading ? (
-                                        <span className="flex items-center gap-1">
+                                        <span className="flex items-center gap-1.5">
                                             <Loader2 className="w-3 h-3 animate-spin" />
-                                            FFmpeg Active
+                                            FFmpeg Loading
                                         </span>
                                     ) : "FFmpeg Ready"}
                                 </Badge>
@@ -178,33 +156,38 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
             {hideControls && activeContent}
 
             {state.isLoading && state.items.length === 0 && (
-                <Card>
-                    <CardContent className="py-6">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-2xl bg-foreground/5 border border-border flex items-center justify-center">
-                                <Loader2 className="w-4 h-4 animate-spin text-foreground/70" />
+                <Card className="bg-card border-border">
+                    <CardContent className="py-8">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="absolute -inset-2 bg-brand-red/10 rounded-xl blur-lg animate-pulse" />
+                                <div className="relative h-12 w-12 rounded-xl bg-brand-red/10 flex items-center justify-center">
+                                    <Loader2 className="w-5 h-5 animate-spin text-brand-red" />
+                                </div>
                             </div>
                             <div className="min-w-0">
-                                <p className="text-sm font-semibold tracking-tight">Fetching info…</p>
+                                <p className="text-sm font-semibold tracking-tight text-foreground">Fetching info…</p>
                                 <p className="text-xs text-muted-foreground truncate">{t("downloading")}</p>
                             </div>
                         </div>
 
-                        <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-foreground/5 border border-border">
-                            <div className="h-full w-1/3 bg-gradient-to-r from-[#FF0000] to-[#FF5500] animate-[indeterminate_1.2s_ease_infinite]" />
+                        <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div className="h-full w-1/3 bg-gradient-to-r from-brand-red to-brand-orange animate-[indeterminate_1.2s_ease_infinite]" />
                         </div>
                     </CardContent>
                 </Card>
             )}
 
             {state.error && (
-                <Card className="border-destructive/50">
-                    <CardContent className="pt-4">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <AlertCircle className="w-8 h-8 text-destructive" />
+                <Card className="bg-destructive/5 border-destructive/20">
+                    <CardContent className="pt-6">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
+                                <AlertCircle className="w-8 h-8 text-destructive" />
+                            </div>
                             <div>
-                                <h3 className="text-destructive mb-2">{t("error")}</h3>
-                                <p className="text-muted-foreground">{state.error}</p>
+                                <h3 className="text-destructive font-semibold mb-2">{t("error")}</h3>
+                                <p className="text-muted-foreground max-w-md">{state.error}</p>
                             </div>
                             <Button
                                 onClick={actions.handleRetry}
@@ -220,34 +203,15 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
             )}
 
             {state.items.length > 0 && (
-                <Card ref={state.resultsRef}>
+                <Card ref={state.resultsRef} className="bg-card border-border">
                     <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <CardTitle>{t("results")} ({state.items.length})</CardTitle>
+                        <CardTitle className="text-foreground">{t("results")} ({state.items.length})</CardTitle>
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                            <div className="flex items-center justify-between sm:justify-start gap-2 rounded-xl bg-foreground/5 border border-border px-3 py-2">
-                                <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
-                                    {(dict as any)?.common?.select_quality || "Quality"}
-                                </span>
-                                <Select
-                                    value={state.mp3QualityKbps.toString()}
-                                    onValueChange={(v) => actions.setMp3QualityKbps(v === "128" ? 128 : 320)}
-                                >
-                                    <SelectTrigger className="w-[110px] h-8 rounded-lg bg-transparent border border-border text-xs font-semibold">
-                                        <SelectValue placeholder="320 kbps" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="128">128 kbps</SelectItem>
-                                        <SelectItem value="320">320 kbps</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
                             {state.items.filter(i => i.kind === "video").length > 1 && (
                                 <Button
                                     onClick={actions.handleDownloadAll}
                                     disabled={state.isDownloadingAll}
-                                    variant="outline"
-                                    className="border-transparent text-white bg-gradient-to-r from-[#FF0000] to-[#FF5500] hover:from-[#FF5500] hover:to-[#FF0000]"
+                                    className="bg-gradient-to-r from-brand-red to-brand-orange text-white hover:shadow-lg hover:shadow-brand-red/20 transition-all duration-300"
                                 >
                                     {state.isDownloadingAll ? (
                                         <>
@@ -269,7 +233,7 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
                             <ResultCard
                                 key={item.id}
                                 item={item}
-                                mp3QualityKbps={state.mp3QualityKbps}
+                                mp3QualityKbps={mp3QualityKbps}
                                 progress={actions.getProgress(item.id)}
                                 onDownload={(item) => actions.handleDownloadSingle(item as YouTubeItem)}
                                 isDownloadingAll={state.isDownloadingAll}

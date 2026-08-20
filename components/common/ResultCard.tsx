@@ -4,7 +4,6 @@ import React from "react";
 import Image from "next/image";
 import {
   Check,
-  Clock,
   Download,
   Loader2,
   Music,
@@ -52,9 +51,7 @@ const formatDuration = (seconds: number) => {
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
   return hrs > 0
-    ? `${hrs}:${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`
+    ? `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
     : `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
@@ -88,56 +85,62 @@ export const ResultCard = React.memo(function ResultCard({
           src={item.thumbnail}
           alt={item.title}
           fill
-          className="object-contain transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+          className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           sizes="(max-width: 640px) 100vw, 96px"
         />
       ) : (
-        <div className="w-full h-full bg-foreground/5 flex items-center justify-center">
-          <Music className="w-8 h-8 text-foreground/10" />
+        <div className="w-full h-full bg-muted flex items-center justify-center">
+          <Music className="w-8 h-8 text-muted-foreground/30" />
         </div>
       )}
 
       {canPreview && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <div className="p-3 rounded-full bg-white text-black transform scale-90 group-hover:scale-100 transition-transform duration-300 shadow-sm shadow-black/30">
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            whileHover={{ scale: 1.1 }}
+            className="p-3 rounded-full bg-card shadow-xl"
+          >
             {isPlaying ? (
-              <Pause className="w-5 h-5 fill-current" />
+              <Pause className="w-5 h-5 text-foreground" />
             ) : (
-              <Play className="w-5 h-5 fill-current ml-0.5" />
+              <Play className="w-5 h-5 text-foreground ml-0.5" />
             )}
-          </div>
+          </motion.div>
         </div>
       )}
 
-      <div className="absolute top-2 left-2 p-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-sm shadow-black/30">
+      {/* Source badge */}
+      <div className="absolute top-2 left-2 p-1.5 rounded-lg bg-card shadow-sm border border-border">
         {source === "youtube" ? (
-          <Youtube className="w-3.5 h-3.5 text-[#FF0000]" />
+          <Youtube className="w-3.5 h-3.5 text-brand-red" />
         ) : (
-          <Music className="w-3.5 h-3.5 text-[#FF5500]" />
+          <Music className="w-3.5 h-3.5 text-brand-orange" />
         )}
       </div>
+
+      {/* Duration badge */}
+      {typeof item.duration === "number" && item.duration > 0 && (
+        <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-xs font-medium text-white">
+          {formatDuration(item.duration)}
+        </div>
+      )}
     </>
   );
-
-  const downloadGradient =
-    source === "youtube"
-      ? "bg-gradient-to-r from-[#FF0000] to-[#FF5500] hover:from-[#FF5500] hover:to-[#FF0000]"
-      : "bg-gradient-to-r from-[#FF5500] to-[#FF0000] hover:from-[#FF0000] hover:to-[#FF5500]";
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-foreground/20 transition-all duration-300 shadow-lg shadow-black/5 dark:shadow-none overflow-hidden"
+      className="group relative flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-border/80 hover:shadow-md transition-all duration-300"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-foreground/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
+      {/* Thumbnail */}
       {canPreview ? (
         <button
           type="button"
           className={cn(
-            "relative w-full sm:w-24 aspect-square rounded-2xl overflow-hidden shrink-0 bg-foreground/5 shadow-sm shadow-black/30 cursor-pointer",
+            "relative w-full sm:w-24 aspect-square rounded-xl overflow-hidden shrink-0 shadow-sm cursor-pointer transition-transform duration-300 group-hover:scale-[1.02]"
           )}
           onClick={handlePreview}
           aria-label={isPlaying ? "Pause preview" : "Play preview"}
@@ -146,52 +149,46 @@ export const ResultCard = React.memo(function ResultCard({
           {thumbnailContent}
         </button>
       ) : (
-        <div className="relative w-full sm:w-24 aspect-square rounded-2xl overflow-hidden shrink-0 bg-foreground/5 shadow-sm shadow-black/30">
+        <div className="relative w-full sm:w-24 aspect-square rounded-xl overflow-hidden shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-[1.02]">
           {thumbnailContent}
         </div>
       )}
 
-      <div className="flex-1 min-w-0 space-y-2 z-10">
+      {/* Content */}
+      <div className="flex-1 min-w-0 space-y-2">
         <h4
-          className="font-semibold text-base sm:text-lg leading-snug truncate text-foreground group-hover:text-foreground/80 transition-colors"
+          className="font-semibold text-base leading-snug truncate text-foreground"
           title={item.title}
         >
           {item.title}
         </h4>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 pr-3 py-1 rounded-full border border-white/5 bg-white/5 text-[10px] font-bold text-foreground/40 tracking-wider uppercase">
-            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-              <User className="w-3.5 h-3.5 text-white" />
-            </div>
+          {/* Artist/Uploader */}
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <User className="w-3.5 h-3.5" />
             <span className="max-w-[180px] truncate">
               {item.uploader || item.artist || t("unknown_artist")}
             </span>
           </div>
 
-          {typeof item.duration === "number" && item.duration > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-foreground/25 uppercase tracking-[0.2em] border border-white/5">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{formatDuration(item.duration)}</span>
-            </div>
-          )}
-
+          {/* Quality badge */}
           {mp3QualityKbps && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-foreground/25 uppercase tracking-[0.2em] border border-white/5">
-              <span>MP3</span>
-              <span className="tabular-nums text-foreground/35">{mp3QualityKbps}kbps</span>
-            </div>
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              {mp3QualityKbps}kbps
+            </span>
           )}
         </div>
       </div>
 
-      <div className="flex flex-row sm:flex-col lg:flex-row items-center gap-2 self-end sm:self-center shrink-0 z-10 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/10">
+      {/* Actions */}
+      <div className="flex flex-row sm:flex-col lg:flex-row items-center gap-2 shrink-0 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-border">
         {canPreview && (
           <Button
-            variant="secondary"
+            variant="outline"
             size="icon"
             onClick={handlePreview}
-            className="h-10 w-10 rounded-xl bg-white/5 text-white border border-white/10"
+            className="h-10 w-10 rounded-xl border-border hover:bg-muted"
             aria-label={isPlaying ? "Pause preview" : "Play preview"}
             disabled={isDownloadingAll}
           >
@@ -207,40 +204,38 @@ export const ResultCard = React.memo(function ResultCard({
           onClick={() => onDownload(item)}
           disabled={isDownloading || isDownloadingAll}
           className={cn(
-            "h-10 px-4 rounded-xl font-bold text-sm transition-all duration-300 shadow-sm flex-1 sm:flex-none focus-visible:ring-2 focus-visible:ring-white/20",
+            "h-10 px-5 rounded-xl font-medium text-sm transition-all duration-300 flex-1 sm:flex-none",
             isCompleted
-              ? "bg-white/8 text-white border border-white/15"
-              : cn(
-                downloadGradient,
-                "text-white hover:scale-[1.02] active:scale-95"
-              )
+              ? "bg-muted text-foreground hover:bg-muted/80"
+              : "bg-gradient-to-r from-brand-orange to-brand-red text-white hover:shadow-md hover:shadow-brand-orange/20"
           )}
         >
           {isDownloading ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-white/85" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               <span className="tabular-nums">{progress?.progress ?? 0}%</span>
             </div>
           ) : isCompleted ? (
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 stroke-[3px]" />
-              <span>{t("downloaded") || "Downloaded"}</span>
+              <Check className="w-4 h-4" />
+              <span>{t("downloaded") || "Done"}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Download className="w-4 h-4" />
-              <span>Download MP3</span>
+              <span>Download</span>
             </div>
           )}
         </Button>
       </div>
 
+      {/* Download progress bar */}
       {isDownloading && (
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-white/5 z-20">
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-muted rounded-b-2xl overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress?.progress ?? 0}%` }}
-            className="h-full bg-gradient-to-r from-[#FF5500] to-[#FF0000]"
+            className="h-full bg-gradient-to-r from-brand-orange to-brand-red"
           />
         </div>
       )}

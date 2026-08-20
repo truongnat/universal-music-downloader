@@ -11,43 +11,23 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { FeaturesSection } from "@/components/home/FeaturesSection";
 import { Footer } from "@/components/home/Footer";
 import { UnifiedControls } from "@/components/home/UnifiedControls";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import dictionary from "@/lib/dictionary.json";
 
 // Hooks
 import { useDebounce } from "@/hooks/use-debounce";
 import { useServiceDetection } from "@/hooks/use-service-detection";
 import { useClientId } from "@/contexts/ClientIdProvider";
+import { useQuality } from "@/contexts/QualityProvider";
 
 type DownloadMode = "single" | "playlist";
-type Mp3QualityKbps = 128 | 320;
 
 export default function HomeClient() {
     const dict = dictionary;
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
-
-    const [mp3QualityKbps, setMp3QualityKbps] = useState<Mp3QualityKbps>(320);
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem("umd_mp3_quality");
-            if (stored === "128") {
-                setMp3QualityKbps(128);
-            } else if (stored === "320") {
-                setMp3QualityKbps(320);
-            }
-        } catch {
-            // Ignore storage access errors (private mode, etc.)
-        }
-    }, []);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem("umd_mp3_quality", mp3QualityKbps.toString());
-        } catch {
-            // Ignore storage access errors
-        }
-    }, [mp3QualityKbps]);
+    const { mp3QualityKbps } = useQuality();
 
     // Input state
     const [inputValue, setInputValue] = useState("");
@@ -113,96 +93,145 @@ export default function HomeClient() {
     const isLoading =
         isSoundCloudClientIdLoading &&
         needsSoundCloudClientId;
+
     return (
-        <div className="min-h-screen text-foreground selection:bg-foreground selection:text-background relative overflow-x-hidden">
+        <div className="min-h-screen relative overflow-hidden">
+            {/* Full-page decorative background */}
+            <div className="absolute inset-0 pointer-events-none">
+                {/* Grid pattern - spans entire page */}
+                <div className="absolute inset-0 opacity-[0.02]" style={{
+                    backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
+                    backgroundSize: '60px 60px'
+                }} />
 
-            <HeroSection
-                title={dict.hero.title}
-                description={dict.hero.description}
-            />
-
-            {/* Main App Section */}
-            <section className="max-w-4xl mx-auto px-4 pb-12 relative z-10">
-
-                {/* Unified Controls */}
-                <div className="mb-6">
-                    <UnifiedControls
-                        inputValue={inputValue}
-                        onInputChange={setInputValue}
-                        onSubmit={handleUnifiedSubmit}
-                        mp3QualityKbps={mp3QualityKbps}
-                        onMp3QualityKbpsChange={setMp3QualityKbps}
-                        canSubmit={inputDetection.isValid}
-                        isLoading={isLoading}
-                    />
-                </div>
-
-                {/* Content Area - Show detected service when ready */}
+                {/* Gradient orbs */}
                 <motion.div
-                    key={`${submittedDetection.service}-${submittedDetection.mode}`}
-                    initial={{ opacity: 0, scale: 0.98, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.98, y: -10 }}
-                    transition={{
-                        duration: 0.4,
-                        ease: [0.16, 1, 0.3, 1]
-                    }}
-                    className="min-h-[400px]"
-                >
-                    {isReady ? (
-                        submittedDetection.service === "soundcloud" ? (
-                            <SoundCloudDownloader
-                                hideInput={true}
-                                hideControls={true}
-                                externalQuery={submittedUrl}
-                                externalMode={submittedDetection.mode as DownloadMode}
-                                externalMp3QualityKbps={mp3QualityKbps}
-                            />
-                        ) : submittedDetection.service === "youtube" ? (
-                            <YouTubeDownloader
-                                hideInput={true}
-                                hideControls={true}
-                                externalQuery={submittedUrl}
-                                externalMode={submittedDetection.mode as DownloadMode}
-                                externalMp3QualityKbps={mp3QualityKbps}
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                                <p className="text-foreground/60 text-sm">Paste a SoundCloud or YouTube link to start.</p>
-                                <p className="text-foreground/30 text-xs">Only direct URLs are supported.</p>
-                            </div>
-                        )
-                    ) : (
-                        // Loading/Error state for SoundCloud prefetch
-                        <div className="flex flex-col items-center justify-center gap-4 py-12">
-                            {soundCloudClientIdError ? (
-                                <>
-                                    <div className="h-12 w-12 flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
-                                        <span className="text-red-500">⚠</span>
-                                    </div>
-                                    <p className="text-foreground/50 text-sm">Failed to load SoundCloud</p>
-                                    <p className="text-foreground/30 text-xs">{soundCloudClientIdError}</p>
-                                </>
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 2, ease: "easeOut" }}
+                    className="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full bg-gradient-to-br from-brand-orange/15 to-brand-red/15 blur-3xl"
+                />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 2, delay: 0.3, ease: "easeOut" }}
+                    className="absolute top-[40%] -left-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-brand-red/10 to-brand-orange/10 blur-3xl"
+                />
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 1.5, delay: 0.5 }}
+                    className="absolute top-[60%] right-0 w-[500px] h-[500px] rounded-full bg-brand-orange/5 blur-3xl"
+                />
+            </div>
+
+            <ErrorBoundary>
+                <HeroSection
+                    title={dict.hero.title}
+                    description={dict.hero.description}
+                />
+
+                {/* Main App Section */}
+                <section className="max-w-4xl mx-auto px-4 pb-16 relative z-10 -mt-4">
+
+                    {/* Unified Controls */}
+                    <div className="mb-10">
+                        <UnifiedControls
+                            inputValue={inputValue}
+                            onInputChange={setInputValue}
+                            onSubmit={handleUnifiedSubmit}
+                            canSubmit={inputDetection.isValid}
+                            isLoading={isLoading}
+                        />
+                    </div>
+
+                    {/* Content Area - Show detected service when ready */}
+                    <motion.div
+                        key={`${submittedDetection.service}-${submittedDetection.mode}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{
+                            duration: 0.4,
+                            ease: [0.16, 1, 0.3, 1]
+                        }}
+                        className="min-h-[400px]"
+                    >
+                        {isReady ? (
+                            submittedDetection.service === "soundcloud" ? (
+                                <SoundCloudDownloader
+                                    hideInput={true}
+                                    hideControls={true}
+                                    externalQuery={submittedUrl}
+                                    externalMode={submittedDetection.mode as DownloadMode}
+                                    externalMp3QualityKbps={mp3QualityKbps}
+                                />
+                            ) : submittedDetection.service === "youtube" ? (
+                                <YouTubeDownloader
+                                    hideInput={true}
+                                    hideControls={true}
+                                    externalQuery={submittedUrl}
+                                    externalMode={submittedDetection.mode as DownloadMode}
+                                    externalMp3QualityKbps={mp3QualityKbps}
+                                />
                             ) : (
-                                <>
-                                    <div className="h-12 w-12 border-4 border-foreground/10 border-t-foreground rounded-full animate-spin" />
-                                    <p className="text-foreground/50 text-sm">Preparing SoundCloud...</p>
-                                    <div className="w-full max-w-sm h-2 overflow-hidden rounded-full bg-white/10 border border-white/10">
-                                        <div className="h-full w-1/3 bg-gradient-to-r from-[#FF5500] to-[#FF0000] animate-[indeterminate_1.2s_ease_infinite]" />
+                                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-muted-foreground/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                        </svg>
                                     </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </motion.div>
-            </section>
+                                    <div className="space-y-2">
+                                        <p className="text-foreground font-medium">
+                                            Paste a link to get started
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Supports SoundCloud and YouTube
+                                        </p>
+                                    </div>
+                                </div>
+                            )
+                        ) : (
+                            // Loading/Error state for SoundCloud prefetch
+                            <div className="flex flex-col items-center justify-center gap-6 py-16">
+                                {soundCloudClientIdError ? (
+                                    <>
+                                        <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-destructive/10">
+                                            <span className="text-destructive text-2xl">⚠</span>
+                                        </div>
+                                        <div className="text-center space-y-2">
+                                            <p className="text-foreground font-medium">Failed to load SoundCloud</p>
+                                            <p className="text-sm text-muted-foreground">{soundCloudClientIdError}</p>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="relative">
+                                            <div className="absolute -inset-4 bg-brand-orange/10 rounded-full blur-xl animate-pulse" />
+                                            <div className="relative h-14 w-14 border-4 border-muted border-t-brand-orange rounded-full animate-spin" />
+                                        </div>
+                                        <div className="text-center space-y-3">
+                                            <p className="text-foreground font-medium">Preparing SoundCloud...</p>
+                                            <div className="w-64 h-1.5 overflow-hidden rounded-full bg-muted">
+                                                <div className="h-full w-1/3 bg-gradient-to-r from-brand-orange to-brand-red animate-[indeterminate_1.2s_ease_infinite]" />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </motion.div>
+                </section>
 
-            <FeaturesSection
-                title={dict.features.title}
-                features={dict.features}
-            />
+                <ErrorBoundary>
+                    <FeaturesSection
+                        title={dict.features.title}
+                        features={dict.features}
+                    />
+                </ErrorBoundary>
 
-            <Footer text={dict.footer.text} />
+                <Footer text={dict.footer.text} />
+            </ErrorBoundary>
         </div>
     );
 }

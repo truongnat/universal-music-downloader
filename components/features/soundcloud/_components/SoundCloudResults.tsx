@@ -5,20 +5,12 @@ import { DownloadCloud, Loader2 } from "lucide-react";
 import dictionary from "@/lib/dictionary.json";
 import { ResultCard } from "@/components/common/ResultCard";
 import { SearchResultItem, DownloadProgress } from "../types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 
 interface SoundCloudResultsProps {
   tracks: SearchResultItem[];
   isDownloadingAll: boolean;
   isAnyLoading: boolean;
   mp3QualityKbps: 128 | 320;
-  onMp3QualityKbpsChange: (v: 128 | 320) => void;
   onDownloadAll: () => void;
   onDownloadSingle: (item: SearchResultItem) => void;
   getProgress: (id: string) => DownloadProgress | undefined;
@@ -36,7 +28,6 @@ export const SoundCloudResults = React.forwardRef<
       isDownloadingAll,
       isAnyLoading,
       mp3QualityKbps,
-      onMp3QualityKbpsChange,
       onDownloadAll,
       onDownloadSingle,
       getProgress,
@@ -55,41 +46,23 @@ export const SoundCloudResults = React.forwardRef<
 
     return (
       <div ref={ref}>
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-white/5 border-white/10">
           <CardHeader>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-x-2 flex items-center">
-                <CardTitle>{t("results")}</CardTitle>
-                <p className="text-muted-foreground">
+                <CardTitle className="text-white">{t("results")}</CardTitle>
+                <p className="text-white/50">
                   {t("results_found")}: {downloadableTracks.length}
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                <div className="flex items-center justify-between sm:justify-start gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                  <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
-                    {(dict as any)?.common?.select_quality || "Quality"}
-                  </span>
-                  <Select
-                    value={mp3QualityKbps.toString()}
-                    onValueChange={(v) => onMp3QualityKbpsChange(v === "128" ? 128 : 320)}
-                  >
-                    <SelectTrigger className="w-[110px] h-8 rounded-lg bg-black/5 dark:bg-white/5 border border-white/10 text-xs font-semibold">
-                      <SelectValue placeholder="320 kbps" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="128">128 kbps</SelectItem>
-                      <SelectItem value="320">320 kbps</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {canDownloadAll && (
                   <Button
                     onClick={onDownloadAll}
                     disabled={isDownloadingAll || isAnyLoading}
                     variant="outline"
-                    className="transition-all duration-200 border-transparent text-white bg-gradient-to-r from-[#FF5500] to-[#FF0000] hover:from-[#FF0000] hover:to-[#FF5500]"
+                    className="transition-all duration-300 border-white/10 text-white bg-gradient-to-r from-[#FF5500] to-[#FF0000] hover:from-[#FF0000] hover:to-[#FF5500] hover:shadow-lg hover:shadow-[#FF5500]/25"
                   >
                     {isDownloadingAll ? (
                       <>

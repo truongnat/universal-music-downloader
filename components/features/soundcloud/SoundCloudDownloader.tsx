@@ -10,16 +10,10 @@ import { useSoundCloudDownloader } from "./hooks/useSoundCloudDownloader";
 import { SoundCloudTabs } from "./_components/SoundCloudTabs";
 import { SoundCloudStatus } from "./_components/SoundCloudStatus";
 import { SoundCloudResults } from "./_components/SoundCloudResults";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import dictionary from "@/lib/dictionary.json";
+import { useQuality } from "@/contexts/QualityProvider";
 
 interface SoundCloudDownloaderProps {
   hideInput?: boolean;
@@ -29,9 +23,10 @@ interface SoundCloudDownloaderProps {
   externalMp3QualityKbps?: 128 | 320;
 }
 
-export function SoundCloudDownloader({ hideInput, hideControls, externalQuery, externalMode, externalMp3QualityKbps }: SoundCloudDownloaderProps) {
+export function SoundCloudDownloader({ hideInput, hideControls, externalQuery, externalMode }: SoundCloudDownloaderProps) {
   const dict = dictionary;
   const { state, actions } = useSoundCloudDownloader();
+  const { mp3QualityKbps } = useQuality();
   const t = (key: string) => (dict as any)?.common?.[key] || key;
 
   const effectiveTab = externalMode ?? state.activeTab;
@@ -43,44 +38,24 @@ export function SoundCloudDownloader({ hideInput, hideControls, externalQuery, e
     }
   }, [externalMode, state.activeTab, actions.setActiveTab]);
 
-  // Sync external MP3 quality
-  React.useEffect(() => {
-    if (externalMp3QualityKbps) {
-      actions.setMp3QualityKbps(externalMp3QualityKbps);
-    }
-  }, [externalMp3QualityKbps, actions.setMp3QualityKbps]);
-
   return (
     <div className="w-full max-w-4xl mx-auto p-2 space-y-4">
       {!hideControls && (
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card/50 backdrop-blur-sm p-4 rounded-xl border">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <span className="w-3 h-3 bg-orange-500 rounded-full animate-pulse" />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border border-border p-5 rounded-2xl">
+          <h2 className="text-xl font-bold flex items-center gap-3 text-foreground">
+            <span className="w-3 h-3 bg-brand-orange rounded-full animate-pulse" />
             SoundCloud Downloader
           </h2>
 
           <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-xs text-muted-foreground font-medium">{(dict as any)?.common?.select_quality || "Quality"}</span>
-              <Select
-                value={state.mp3QualityKbps.toString()}
-                onValueChange={(v) => actions.setMp3QualityKbps((v === "128" ? 128 : 320) as 128 | 320)}
-              >
-                <SelectTrigger className="w-[100px] h-8 text-xs">
-                  <SelectValue placeholder="320 kbps" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="128">128 kbps</SelectItem>
-                  <SelectItem value="320">320 kbps</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Badge variant={state.isAnyLoading ? "outline" : "secondary"} className="h-6">
+            <Badge
+              variant={state.isAnyLoading ? "outline" : "secondary"}
+              className="h-7 px-3"
+            >
               {state.isAnyLoading ? (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1.5">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  FFmpeg
+                  FFmpeg Loading
                 </span>
               ) : "FFmpeg Ready"}
             </Badge>
@@ -161,8 +136,7 @@ export function SoundCloudDownloader({ hideInput, hideControls, externalQuery, e
         tracks={state.tracks}
         isDownloadingAll={state.isDownloadingAll}
         isAnyLoading={state.isAnyLoading}
-        mp3QualityKbps={state.mp3QualityKbps}
-        onMp3QualityKbpsChange={actions.setMp3QualityKbps}
+        mp3QualityKbps={mp3QualityKbps}
         onDownloadAll={actions.handleDownloadAll}
         onDownloadSingle={actions.handleDownloadSingle}
         getProgress={actions.getProgressForTrack}

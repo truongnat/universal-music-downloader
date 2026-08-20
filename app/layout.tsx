@@ -3,14 +3,16 @@ import "./globals.css";
 
 // Contexts & Components
 import { ClientIdProvider } from "@/contexts/ClientIdProvider";
+import { QualityProvider } from "@/contexts/QualityProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/common/Header";
 import { ScrollToTopButton } from "@/components/common/ScrollToTopButton";
 import dictionary from "@/lib/dictionary.json";
 import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
+import { getBaseUrl } from "@/lib/get-base-url";
 
 // --- Constants & Types ---
-const BASE_URL = "https://universal-music-downloader-truongdqdev-9126s-projects.vercel.app";
+const BASE_URL = getBaseUrl();
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
@@ -97,16 +99,18 @@ export default async function RootLayout({
       </head>
       <body className="antialiased">
         <ClientIdProvider initialClientId={initialClientId}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <Header />
-            {children}
-            <ScrollToTopButton />
-          </ThemeProvider>
+          <QualityProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <Header />
+              {children}
+              <ScrollToTopButton />
+            </ThemeProvider>
+          </QualityProvider>
         </ClientIdProvider>
       </body>
     </html>
