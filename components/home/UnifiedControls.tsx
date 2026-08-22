@@ -126,6 +126,7 @@ export function UnifiedControls({
                 transition={{ duration: 0.6, delay: 0.3 }}
             >
                 {/* Main search bar */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-driven file drop target; the inner input is fully keyboard accessible */}
                 <div
                     className="relative group"
                     onDragOver={handleDragOver}
@@ -253,6 +254,7 @@ export function UnifiedControls({
                                 {/* Paste button */}
                                 {!hasValue && (
                                     <button
+                                        type="button"
                                         onClick={handlePaste}
                                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                     >
@@ -303,6 +305,7 @@ export function UnifiedControls({
                                 {([128, 320] as const).map((q) => (
                                     <button
                                         key={q}
+                                        type="button"
                                         onClick={() => setMp3QualityKbps(q)}
                                         className={
                                             `relative px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${

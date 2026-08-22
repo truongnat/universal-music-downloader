@@ -192,6 +192,7 @@ export function SearchBar({ placeholder = "Search for songs...", className }: Se
         />
         {query && (
           <button
+            type="button"
             onClick={() => {
               setQuery('');
               setResults([]);
@@ -217,6 +218,7 @@ export function SearchBar({ placeholder = "Search for songs...", className }: Se
             {/* Service tabs */}
             <div className="flex border-b border-border">
               <button
+                type="button"
                 onClick={() => handleTabChange('youtube')}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
@@ -229,6 +231,7 @@ export function SearchBar({ placeholder = "Search for songs...", className }: Se
                 YouTube
               </button>
               <button
+                type="button"
                 onClick={() => handleTabChange('soundcloud')}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
@@ -257,6 +260,7 @@ export function SearchBar({ placeholder = "Search for songs...", className }: Se
                   {/* Queue All button */}
                   {results.length > 1 && (
                     <button
+                      type="button"
                       onClick={handleDownloadAll}
                       className="w-full flex items-center justify-center gap-2 py-2 mb-1 rounded-lg bg-muted/50 hover:bg-muted text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                     >
@@ -327,6 +331,7 @@ export function SearchBar({ placeholder = "Search for songs...", className }: Se
                       {/* Actions */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDownload(result);

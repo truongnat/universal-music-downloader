@@ -12,13 +12,15 @@ export interface DownloadItem {
   title: string;
   thumbnail?: string;
   artist?: string;
-  source: 'soundcloud' | 'youtube';
+  source: 'soundcloud' | 'youtube' | 'tiktok';
   format: AudioFormat;
   status: DownloadStatus;
   progress: number;
   error?: string;
   retries: number;
   maxRetries: number;
+  /** Timestamp before which the queue must not pick this item up (retry backoff) */
+  nextAttemptAt?: number;
   filename?: string;
   createdAt: number;
 }
@@ -34,6 +36,8 @@ interface DownloadQueueContextType {
   cancelItem: (id: string) => void;
   getProgress: (id: string) => number;
   getItem: (id: string) => DownloadItem | undefined;
+  /** Find the newest queue item for a given source URL (survives page reloads) */
+  getByUrl: (url: string) => DownloadItem | undefined;
   setMaxParallel: (n: number) => void;
 }
 
@@ -67,6 +71,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           ...item,
           status: item.status === 'downloading' ? 'queued' : item.status,
           progress: item.status === 'downloading' ? 0 : item.progress,
+          nextAttemptAt: undefined, // don't restore stale backoff timers
         }));
         setQueue(restored.filter((item: DownloadItem) => item.status !== 'completed'));
       }
@@ -124,7 +129,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const retryItem = useCallback((id: string) => {
     activeDownloadsRef.current.delete(id);
     setQueue(prev => prev.map(item =>
-      item.id === id ? { ...item, status: 'queued' as const, progress: 0, error: undefined, retries: 0 } : item
+      item.id === id ? { ...item, status: 'queued' as const, progress: 0, error: undefined, retries: 0, nextAttemptAt: undefined } : item
     ));
   }, []);
 
@@ -134,7 +139,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearAll = useCallback(() => {
-    abortControllersRef.current.forEach(controller => controller.abort());
+    abortControllersRef.current.forEach(controller => {
+      controller.abort();
+    });
     abortControllersRef.current.clear();
     activeDownloadsRef.current.clear();
     setQueue([]);
@@ -147,6 +154,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   const getItem = useCallback((id: string) => {
     return queue.find(item => item.id === id);
+  }, [queue]);
+
+  const getByUrl = useCallback((url: string) => {
+    // Newest first so a re-queued duplicate reflects the latest attempt
+    return [...queue].reverse().find(item => item.url === url);
   }, [queue]);
 
   // Download a single item — uses functional state updates to avoid stale closures
@@ -165,7 +177,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     try {
       const downloadUrl = item.source === 'youtube'
         ? `/api/youtube/download?url=${encodeURIComponent(item.url)}&format=${item.format}&title=${encodeURIComponent(item.title)}`
-        : `/api/soundcloud/download?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}&client_id=`;
+        : item.source === 'tiktok'
+          ? `/api/tiktok/download?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}`
+          : `/api/soundcloud/download?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}&client_id=`;
 
       const response = await fetch(downloadUrl, {
         signal: controller.signal,
@@ -173,7 +187,17 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        // Carry rate-limit info into backoff so we respect Retry-After
+        let retryAfterMs: number | undefined;
+        if (response.status === 429) {
+          const ra = response.headers.get('Retry-After');
+          const parsed = ra ? Number(ra) * 1000 : NaN;
+          retryAfterMs = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 120_000) : undefined;
+        }
+        throw Object.assign(
+          new Error(errorData.error || `HTTP ${response.status}`),
+          { status: response.status, retryAfterMs }
+        );
       }
 
       const blob = await response.blob();
@@ -220,7 +244,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const errorMsg = error.message || 'Download failed';
+      const errorMsgRaw = error.message || 'Download failed';
+      const isRateLimited = error.status === 429;
 
       // Read current retries from the queue using a ref pattern
       setQueue(prev => {
@@ -230,14 +255,22 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         const currentRetries = current.retries + 1;
 
         if (currentRetries < current.maxRetries) {
-          const delay = Math.pow(2, currentRetries) * 1000;
-          toast.warning(`Retrying "${item.title}" (${currentRetries}/${current.maxRetries})`);
+          // Rate-limited requests wait for the server's Retry-After; others use exponential backoff
+          const baseDelay = isRateLimited && error.retryAfterMs
+            ? error.retryAfterMs
+            : Math.pow(2, currentRetries) * 1000;
+          const delay = Math.min(baseDelay, 120_000);
+          toast.warning(
+            isRateLimited
+              ? `Rate limited — retrying "${item.title}" in ${Math.round(delay / 1000)}s (${currentRetries}/${current.maxRetries})`
+              : `Retrying "${item.title}" (${currentRetries}/${current.maxRetries})`
+          );
 
-          // Schedule retry via setTimeout — no stale closure, we set status directly
+          // Hold the item out of processing until the delay elapses.
+          // Clearing nextAttemptAt mutates state, which re-triggers processQueue.
           setTimeout(() => {
-            activeDownloadsRef.current.delete(item.id);
-            setQueue(prev => prev.map(q =>
-              q.id === item.id ? { ...q, status: 'queued' as const, progress: 0, error: undefined } : q
+            setQueue(q => q.map(i =>
+              i.id === item.id && i.nextAttemptAt ? { ...i, nextAttemptAt: undefined } : i
             ));
           }, delay);
 
@@ -247,18 +280,20 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
               status: 'queued' as const,
               progress: 0,
               retries: currentRetries,
-              error: `${errorMsg} (retry ${currentRetries}/${current.maxRetries})`,
+              nextAttemptAt: Date.now() + delay,
+              error: `${errorMsgRaw} (retry ${currentRetries}/${current.maxRetries})`,
             } : q
           );
         } else {
-          toast.error(`Failed to download "${item.title}": ${errorMsg}`);
+          toast.error(`Failed to download "${item.title}": ${errorMsgRaw}`);
           return prev.map(q =>
             q.id === item.id ? {
               ...q,
               status: 'error' as const,
               progress: 0,
-              error: errorMsg,
+              error: errorMsgRaw,
               retries: currentRetries,
+              nextAttemptAt: undefined,
             } : q
           );
         }
@@ -270,9 +305,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Process queue — uses functional state to avoid stale closures
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `queue` is read functionally but its change IS the trigger that starts pending downloads
   useEffect(() => {
     setQueue(prev => {
-      const pendingItems = prev.filter(item => item.status === 'queued');
+      const now = Date.now();
+      // Skip items waiting out their retry backoff window
+      const pendingItems = prev.filter(item =>
+        item.status === 'queued' &&
+        (!item.nextAttemptAt || item.nextAttemptAt <= now)
+      );
       const downloadingCount = prev.filter(item => item.status === 'downloading').length;
 
       if (pendingItems.length === 0 || downloadingCount >= MAX_PARALLEL_DEFAULT) return prev;
@@ -304,6 +345,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       cancelItem,
       getProgress,
       getItem,
+      getByUrl,
       setMaxParallel,
     }}>
       {children}

@@ -7,6 +7,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 // Components
 import { SoundCloudDownloader } from "@/components/features/soundcloud/SoundCloudDownloader";
 import { YouTubeDownloader } from "@/components/features/youtube/YouTubeDownloader";
+import { TikTokDownloader } from "@/components/features/tiktok/TikTokDownloader";
 import { HeroSection } from "@/components/home/HeroSection";
 import { FeaturesSection } from "@/components/home/FeaturesSection";
 import { Footer } from "@/components/home/Footer";
@@ -89,7 +90,11 @@ export default function HomeClient() {
     const needsSoundCloudClientId =
         submittedDetection.isUrl && submittedDetection.service === "soundcloud";
 
-    const isReady = !needsSoundCloudClientId || soundCloudClientId !== null;
+    // TikTok doesn't need client-id prefetch — always ready immediately
+    const isReady =
+        !needsSoundCloudClientId ||
+        soundCloudClientId !== null ||
+        submittedDetection.service === "tiktok";
 
     const isLoading =
         isSoundCloudClientIdLoading &&
@@ -185,10 +190,12 @@ export default function HomeClient() {
                                     externalMode={submittedDetection.mode as DownloadMode}
                                     externalMp3QualityKbps={mp3QualityKbps}
                                 />
+                            ) : submittedDetection.service === "tiktok" ? (
+                                <TikTokDownloader externalQuery={submittedUrl} />
                             ) : (
                                 <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
                                     <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-                                        <svg className="w-8 h-8 text-muted-foreground/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg aria-hidden="true" focusable="false" className="w-8 h-8 text-muted-foreground/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                                         </svg>
                                     </div>
@@ -197,7 +204,7 @@ export default function HomeClient() {
                                             Paste a link to get started
                                         </p>
                                         <p className="text-sm text-muted-foreground">
-                                            Supports SoundCloud and YouTube
+                                            Supports SoundCloud, YouTube and TikTok
                                         </p>
                                     </div>
                                 </div>

@@ -1,7 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Rate limit client-id scraping: it fetches and parses SoundCloud HTML (expensive)
+  const rl = checkRateLimit(`sc-client-id:${getClientIdentifier(req)}`, {
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   try {
     const clientId = await getSoundCloudClientId();
 

@@ -1,8 +1,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSoundCloudPlaylist } from '@/lib/soundcloud-api';
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from '@/lib/rate-limit';
 
 export async function GET(req: NextRequest) {
+  // Rate limit playlist metadata: 20/min per client
+  const rl = checkRateLimit(`sc-playlist:${getClientIdentifier(req)}`, {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   const { searchParams } = new URL(req.url);
   const rawUrl = searchParams.get('url');
 

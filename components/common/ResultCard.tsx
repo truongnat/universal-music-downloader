@@ -59,8 +59,9 @@ export const ResultCard = React.memo(function ResultCard({
   const dict = dictionary;
   const t = (key: string) => (dict as any)?.common?.[key] || key;
 
-  const { addToQueue, getItem } = useDownloadQueue();
-  const queueItem = getItem(item.id);
+  const { addToQueue, getByUrl } = useDownloadQueue();
+  // Match by source URL (queue items have generated IDs that differ from media IDs)
+  const queueItem = getByUrl(item.url);
   const isDownloading = queueItem?.status === 'downloading';
   const isCompleted = queueItem?.status === 'completed';
   const isQueued = queueItem?.status === 'queued';

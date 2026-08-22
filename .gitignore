@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# session cookies for yt-dlp (contain login credentials — never commit)
+cookies.txt
+
 # debug
 npm-debug.log*
 yarn-debug.log*

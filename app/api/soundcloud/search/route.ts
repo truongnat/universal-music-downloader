@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSoundCloudClientId } from "@/lib/soundcloud-client-id";
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  // Rate limit searches: 20/min per client
+  const rl = checkRateLimit(`sc-search:${getClientIdentifier(req)}`, {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   const query = req.nextUrl.searchParams.get("q");
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "10");
 

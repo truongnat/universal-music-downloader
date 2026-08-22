@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStreamSongUrl } from "@/lib/soundcloud-api";
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
+import { contentDispositionHeader } from "@/lib/yt-dlp-stream";
 
 // Helper function to convert Node.js stream to Web Stream
 export async function GET(req: NextRequest) {
+  // Rate limit downloads: 15/min per client
+  const rl = checkRateLimit(`sc-download:${getClientIdentifier(req)}`, {
+    limit: 15,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   const { searchParams } = new URL(req.url);
   const trackUrl = searchParams.get("url");
   const title = searchParams.get("title") || "unknown";
@@ -145,21 +154,12 @@ export async function GET(req: NextRequest) {
     } else if (upstreamContentType.includes("wav")) {
       ext = "wav";
     }
-    // Generate filename - use track title with detected extension
-    const asciiFilename = title.replace(/[^\x20-\x7E]/g, '_');
-    const encodedFilename = encodeURIComponent(title);
-    const baseFilename = `${title}.${ext}`;
-
-    // Set up response headers for file download
+    // Generate filename headers using the shared RFC 5987 helper
     const headers = new Headers();
     // Forward upstream content-type when possible to avoid mislabeling non-audio responses
     headers.set("Content-Type", upstreamContentType);
     const isPreview = searchParams.get("preview") === "true";
-    const dispositionType = isPreview ? 'inline' : 'attachment';
-    headers.set(
-      "Content-Disposition",
-      `${dispositionType}; filename="${asciiFilename}.${ext}"; filename*=UTF-8''${encodedFilename}.${ext}`
-    );
+    headers.set("Content-Disposition", contentDispositionHeader(title, ext, isPreview));
     headers.set("Cache-Control", "no-cache");
 
     // Explicitly set Accept-Ranges to allow seeking
@@ -186,24 +186,9 @@ export async function GET(req: NextRequest) {
       // Letting it slide if status is 206 or just logging
     }
 
-    const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
-    let downloadedSize = 0;
-
-    const progressStream = new TransformStream({
-      transform(chunk, controller) {
-        downloadedSize += chunk.length;
-        // const progress = totalSize > 0 ? Math.round((downloadedSize / totalSize) * 100) : 0;
-        // controller.enqueue(chunk);
-        // Note: For partial content, progress calculation based on totalSize (which might be chunk size) is misleading for full file download
-        // But for playback it doesn't matter much.
-        controller.enqueue(chunk);
-      },
-    });
-
     // Stream the audio data directly to the client
     if (audioResponse.body) {
-      const streamingBody = audioResponse.body.pipeThrough(progressStream);
-      return new NextResponse(streamingBody, {
+      return new NextResponse(audioResponse.body, {
         status: audioResponse.status === 206 ? 206 : 200,
         headers,
       });

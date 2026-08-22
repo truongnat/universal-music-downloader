@@ -1,5 +1,6 @@
 import { getYouTubePlaylist, getYouTubeVideo } from "@/lib/youtube-api";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 
 type YouTubeInfoRequestBody = {
   url?: string;
@@ -9,6 +10,13 @@ type YouTubeInfoRequestBody = {
 };
 
 export async function POST(req: NextRequest) {
+  // Rate limit metadata lookups: yt-dlp invocations are expensive
+  const rl = checkRateLimit(`yt-info:${getClientIdentifier(req)}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   try {
     const body: YouTubeInfoRequestBody = await req.json();
 

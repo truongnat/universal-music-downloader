@@ -20,7 +20,7 @@ interface HistoryItem {
   title: string;
   thumbnail?: string;
   artist?: string;
-  source: 'soundcloud' | 'youtube';
+  source: 'soundcloud' | 'youtube' | 'tiktok';
   filename?: string;
   downloadedAt: number;
 }

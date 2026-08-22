@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initYtDlp, commonYtDlpArgs, formatYtDlpError } from "@/lib/youtube-api";
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  // Rate limit searches: 20/min per client
+  const rl = checkRateLimit(`yt-search:${getClientIdentifier(req)}`, {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
+
   const query = req.nextUrl.searchParams.get("q");
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "10");
 

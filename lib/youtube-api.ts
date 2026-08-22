@@ -12,6 +12,28 @@ const getBinaryPath = () => {
     return path.join(process.cwd(), 'bin', 'yt-dlp.exe');
 };
 
+// Re-download the binary when older than this so long-lived deployments
+// pick up yt-dlp fixes for YouTube's constant API changes.
+const BINARY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const isBinaryStale = (binaryPath: string): boolean => {
+    try {
+        const stat = fs.statSync(binaryPath);
+        return Date.now() - stat.mtimeMs > BINARY_MAX_AGE_MS;
+    } catch {
+        return false;
+    }
+};
+
+const downloadBinary = async (binaryPath: string): Promise<void> => {
+    console.log(`Downloading yt-dlp to ${binaryPath}...`);
+    await YtdlpWrap.downloadFromGithub(binaryPath);
+    // On Linux/Mac, ensure it is executable
+    if (process.platform !== 'win32') {
+        fs.chmodSync(binaryPath, '755');
+    }
+};
+
 export const initYtDlp = async () => {
     const binaryPath = getBinaryPath();
 
@@ -22,20 +44,44 @@ export const initYtDlp = async () => {
     }
 
     if (!fs.existsSync(binaryPath)) {
-        console.log(`Downloading yt-dlp to ${binaryPath}...`);
         try {
-            await YtdlpWrap.downloadFromGithub(binaryPath);
-            // On Linux/Mac, ensure it is executable
-            if (process.platform !== 'win32') {
-                fs.chmodSync(binaryPath, '755');
-            }
+            await downloadBinary(binaryPath);
         } catch (e) {
             console.error("Failed to download yt-dlp", e);
             throw e;
         }
+    } else if (isBinaryStale(binaryPath)) {
+        // Refresh in place; keep the old binary if the download fails so the
+        // app degrades to "possibly stale" instead of "hard down".
+        try {
+            await downloadBinary(binaryPath);
+        } catch (e) {
+            console.error("yt-dlp refresh failed, using existing binary", e);
+        }
     }
 
     return new YtdlpWrap(binaryPath);
+};
+
+/**
+ * Cookies are optional (used for age-restricted/member content).
+ * Resolve order: YTDLP_COOKIES_PATH env → ./cookies.txt next to the project.
+ * The arg is only passed when the file actually exists, so fresh clones and
+ * serverless deploys don't break on a missing file.
+ */
+const resolveCookiesArgs = (): string[] => {
+    const candidates = [
+        process.env.YTDLP_COOKIES_PATH,
+        path.join(process.cwd(), "cookies.txt"),
+    ].filter((p): p is string => Boolean(p));
+    for (const candidate of candidates) {
+        try {
+            if (fs.existsSync(candidate)) return ["--cookies", candidate];
+        } catch {
+            // unreadable path — skip
+        }
+    }
+    return [];
 };
 
 export const commonYtDlpArgs = [
@@ -43,8 +89,16 @@ export const commonYtDlpArgs = [
     "--js-runtime", "node",
     "--prefer-free-formats",
     "--no-warnings",
-    "--extractor-args", "youtube:player_client=web,android_vr,tv_downgraded",
-    "--cookies", "/app/cookies.txt"
+    // NOTE: do NOT pin youtube:player_client here.
+    // A previously-pinned list (web,android_vr,tv_downgraded) went stale and
+    // only exposed muxed format 18, which YouTube 403-blocks on datacenter
+    // IPs. yt-dlp's maintained defaults select working audio-only formats
+    // (e.g. 140). If a specific client is ever needed again, make it
+    // env-overridable instead of hardcoding:
+    ...(process.env.YTDLP_EXTRACTOR_ARGS
+        ? ["--extractor-args", process.env.YTDLP_EXTRACTOR_ARGS]
+        : []),
+    ...resolveCookiesArgs()
 ];
 
 export const formatYtDlpError = (error: any): string => {

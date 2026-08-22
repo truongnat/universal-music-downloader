@@ -1,206 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initYtDlp, commonYtDlpArgs } from "@/lib/youtube-api";
-
-function detectAudioContainer(chunk: Uint8Array): { contentType: string; ext: string } {
-    // MP4/M4A: look for 'ftyp' within first bytes
-    const ascii = new TextDecoder().decode(chunk.slice(0, 256));
-    if (ascii.includes("ftyp")) return { contentType: "audio/mp4", ext: "m4a" };
-
-    // WebM/Matroska: EBML header 1A 45 DF A3
-    if (chunk.length >= 4 && chunk[0] === 0x1a && chunk[1] === 0x45 && chunk[2] === 0xdf && chunk[3] === 0xa3) {
-        return { contentType: "audio/webm", ext: "webm" };
-    }
-
-    // OGG
-    if (ascii.startsWith("OggS")) return { contentType: "audio/ogg", ext: "ogg" };
-
-    // MP3 (ID3 or frame sync)
-    if (ascii.startsWith("ID3")) return { contentType: "audio/mpeg", ext: "mp3" };
-    if (chunk.length >= 2 && chunk[0] === 0xff && (chunk[1] & 0xe0) === 0xe0) {
-        return { contentType: "audio/mpeg", ext: "mp3" };
-    }
-
-    return { contentType: "application/octet-stream", ext: "bin" };
-}
+import { checkRateLimit, getClientIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
+import { ytDlpStreamResponse, attachYtDlpDiagnostics } from "@/lib/yt-dlp-stream";
+import { extractYouTubeVideoId } from "@/lib/invidious";
+import { resolveFallbackAudio } from "@/lib/providers";
 
 export async function GET(req: NextRequest) {
-    const url = req.nextUrl.searchParams.get("url");
+  // Rate limit downloads: 10/min per client (yt-dlp spawns are expensive)
+  const rl = checkRateLimit(`yt-download:${getClientIdentifier(req)}`, {
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) return rateLimitedResponse(rl);
 
-    if (!url) {
-        return NextResponse.json({ error: "URL is required" }, { status: 400 });
-    }
+  const url = req.nextUrl.searchParams.get("url");
+  if (!url) {
+    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+  }
 
-    try {
-        const yt = await initYtDlp();
+  const title = req.nextUrl.searchParams.get("title") || "download";
+  const isPreview = req.nextUrl.searchParams.get("preview") === "true";
 
-	        // Construct arguments
-	        // -o - writes to stdout
-	        // Force a single item even if a playlist URL is passed.
-	        let args = [
-	            url,
-	            "--no-playlist",
-	            "-o",
-	            "-",
-	            // Prefer audio-only formats, fallback to best overall if audio-only is missing for some reason
-	            "-f",
-	            "bestaudio[ext=m4a]/bestaudio/best",
-	        ];
-	        args.push(...commonYtDlpArgs);
+  // Primary path: yt-dlp direct extraction
+  try {
+    const yt = await initYtDlp();
 
-        console.log("Starting yt-dlp with args:", args.join(" "));
+    // -o - writes to stdout; --no-playlist forces a single item even if a
+    // playlist URL is passed; prefer audio-only formats with sane fallbacks.
+    const args = [
+      url,
+      "--no-playlist",
+      "-o",
+      "-",
+      "-f",
+      "bestaudio[ext=m4a]/bestaudio/best",
+      ...commonYtDlpArgs,
+    ];
 
-        const nodeStream = yt.execStream(args);
+    const nodeStream = yt.execStream(args);
+    attachYtDlpDiagnostics(nodeStream, "youtube");
 
-        // Peek the first chunk to set a sane Content-Type for preview playback.
-        const firstChunk = await new Promise<Uint8Array | null>((resolve, reject) => {
-            const onData = (chunk: Uint8Array) => resolve(chunk);
-            const onError = (err: unknown) => reject(err);
-            const onEnd = () => resolve(null);
+    return await ytDlpStreamResponse(req, {
+      nodeStream,
+      signal: req.signal,
+      title,
+      isPreview,
+    });
+  } catch (error: unknown) {
+    console.error("yt-dlp path failed, considering Invidious fallback:", error);
 
-            nodeStream.once("data", onData);
-            nodeStream.once("error", onError);
-            nodeStream.once("end", onEnd);
-        });
-
-	        const detected = firstChunk ? detectAudioContainer(firstChunk) : { contentType: "application/octet-stream", ext: "bin" };
-	
-	        // Convert Node.js stream to Web ReadableStream for better Next.js compatibility
-	        const stream = new ReadableStream({
-	            start(controller) {
-	                let isClosed = false;
-	                const onAbort = () => {
-	                    try {
-	                        nodeStream.destroy();
-	                    } finally {
-	                        safeClose();
-	                    }
-	                };
-
-	                const cleanup = () => {
-	                    nodeStream.off("data", onData);
-	                    nodeStream.off("end", onEnd);
-	                    nodeStream.off("close", onClose);
-	                    nodeStream.off("error", onError);
-	                    req.signal.removeEventListener("abort", onAbort);
-	                };
-
-	                const safeClose = () => {
-	                    if (isClosed) return;
-	                    isClosed = true;
-	                    cleanup();
-	                    try {
-	                        controller.close();
-	                    } catch {
-	                        // Ignore invalid state (e.g. client canceled request)
-	                    }
-	                };
-
-	                const safeError = (err: unknown) => {
-	                    if (isClosed) return;
-	                    isClosed = true;
-	                    cleanup();
-	                    try {
-	                        controller.error(err);
-	                    } catch {
-	                        // Ignore invalid state (e.g. client canceled request)
-	                    }
-	                };
-
-	                const onData = (chunk: Uint8Array) => {
-	                    if (isClosed) return;
-	                    try {
-	                        controller.enqueue(chunk);
-	                    } catch (err) {
-	                        safeError(err);
-	                    }
-	                };
-
-	                const onEnd = () => safeClose();
-	                const onClose = () => safeClose();
-	                const onError = (err: unknown) => {
-	                    console.error("yt-dlp stream error:", err);
-	                    safeError(err);
-	                };
-
-	                req.signal.addEventListener("abort", onAbort);
-
-	                if (firstChunk) onData(firstChunk);
-	                nodeStream.on("data", onData);
-	                nodeStream.on("end", onEnd);
-	                nodeStream.on("close", onClose);
-	                nodeStream.on("error", onError);
-	            },
-	            cancel() {
-	                try {
-	                    nodeStream.destroy();
-	                } catch {
-	                    // ignore
-	                }
-	            },
-	        });
-
-        // Access underlying process if available for logging
-        const childProcess = (nodeStream as any).ytDlpProcess;
-
-	        if (childProcess) {
-	            childProcess.stderr?.on('data', (data: any) => {
-	                const message = data.toString();
-	                const normalized = message.trim().toLowerCase();
-	                const shouldIgnore =
-	                    !normalized ||
-	                    normalized.includes("%") ||
-	                    normalized.includes("ffmpeg not found") ||
-	                    normalized.includes("unavailable video is hidden");
-	
-	                if (!shouldIgnore) {
-	                    console.error(`yt-dlp stderr: ${message}`);
-	                }
-	            });
-
-            childProcess.on('error', (err: any) => {
-                console.error("Failed to start yt-dlp:", err);
+    // Fallback path: configured provider chain (Invidious → Piped), active
+    // only when INVIDIOUS_BASE_URL / PIPED_BASE_URL are set. Streams the
+    // instance's copy of the audio straight through — no yt-dlp involved.
+    const videoId = extractYouTubeVideoId(url);
+    if (videoId) {
+      const audio = await resolveFallbackAudio(videoId);
+      if (audio) {
+        try {
+          const upstream = await fetch(audio.url, { signal: req.signal });
+          if (upstream.ok && upstream.body) {
+            console.log(
+              `[providers] streaming ${videoId} via ${audio.source} (${audio.ext})`
+            );
+            return new NextResponse(upstream.body, {
+              headers: {
+                "Content-Type":
+                  upstream.headers.get("content-type") ?? "audio/mp4",
+                "X-Served-By": audio.source,
+                "Content-Disposition": `${isPreview ? "inline" : "attachment"}; filename="${encodeURIComponent(title)}.${audio.ext}"`,
+              },
             });
-
-            childProcess.on('close', (code: any) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp exited with code ${code}`);
-                } else {
-                    console.log("yt-dlp finished successfully");
-                }
-            });
+          }
+          console.error(`[providers] media fetch failed: ${upstream.status}`);
+        } catch (err) {
+          console.error("[providers] media stream error:", err);
         }
-
-
-        const isPreview = req.nextUrl.searchParams.get("preview") === "true";
-        const title = req.nextUrl.searchParams.get("title") || "download";
-
-        // Remove characters that are unsafe for header values and non-ASCII for the basic 'filename' parameter
-        const safeTitle = title
-            .replace(/["\\]/g, '')
-            .replace(/[^\x20-\x7E]/g, '_'); // Replace non-ASCII with underscore for fallback
-
-        const encodedTitle = encodeURIComponent(title);
-        const fileExt = detected.ext;
-
-        // Return the stream
-        const headers = new Headers();
-
-        // Standard way to handle UTF-8 filenames in Content-Disposition
-        const dispositionType = isPreview ? 'inline' : 'attachment';
-        headers.set(
-            "Content-Disposition",
-            `${dispositionType}; filename="${safeTitle}.${fileExt}"; filename*=UTF-8''${encodedTitle}.${fileExt}`
-        );
-
-        headers.set("Content-Type", detected.contentType);
-
-        return new NextResponse(stream, { headers });
-
-    } catch (error: any) {
-        console.error("Download API Error:", error);
-        return NextResponse.json(
-            { error: error.message || "Failed to download" },
-            { status: 500 }
-        );
+      }
     }
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to download",
+      },
+      { status: 500 }
+    );
+  }
 }

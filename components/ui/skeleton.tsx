@@ -34,8 +34,8 @@ export function TrackSkeleton() {
 export function PlaylistSkeleton() {
   return (
     <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TrackSkeleton key={i} />
+      {["track-1", "track-2", "track-3", "track-4", "track-5"].map((key) => (
+        <TrackSkeleton key={key} />
       ))}
     </div>
   );
