@@ -234,8 +234,6 @@ export function YouTubeDownloader({ hideInput, hideControls, externalQuery, exte
                                 key={item.id}
                                 item={item}
                                 mp3QualityKbps={mp3QualityKbps}
-                                progress={actions.getProgress(item.id)}
-                                onDownload={(item) => actions.handleDownloadSingle(item as YouTubeItem)}
                                 isDownloadingAll={state.isDownloadingAll}
                                 activePreviewId={state.previewItem?.id}
                                 onPreview={(item) => actions.handlePreview(item as YouTubeItem)}

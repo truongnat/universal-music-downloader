@@ -30,17 +30,9 @@ interface MediaItem {
   kind: "track" | "video" | "playlist";
 }
 
-interface DownloadProgress {
-  id: string;
-  progress: number;
-  status: "downloading" | "completed" | "error";
-}
-
 interface ResultCardProps {
   item: MediaItem;
   mp3QualityKbps?: 128 | 320;
-  progress?: DownloadProgress;
-  onDownload: (item: MediaItem) => void;
   isDownloadingAll?: boolean;
   activePreviewId?: string | null;
   onPreview?: (item: MediaItem) => void;
@@ -59,8 +51,6 @@ const formatDuration = (seconds: number) => {
 export const ResultCard = React.memo(function ResultCard({
   item,
   mp3QualityKbps,
-  progress,
-  onDownload,
   isDownloadingAll,
   activePreviewId,
   onPreview,
@@ -72,7 +62,7 @@ export const ResultCard = React.memo(function ResultCard({
   const { addToQueue, getItem } = useDownloadQueue();
   const queueItem = getItem(item.id);
   const isDownloading = queueItem?.status === 'downloading';
-  const isCompleted = queueItem?.status === 'completed' || progress?.status === "completed";
+  const isCompleted = queueItem?.status === 'completed';
   const isQueued = queueItem?.status === 'queued';
   const isPlaying = activePreviewId === item.id;
   const canPreview = typeof onPreview === "function";
@@ -230,7 +220,7 @@ export const ResultCard = React.memo(function ResultCard({
           {isDownloading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="tabular-nums">{queueItem?.progress ?? progress?.progress ?? 0}%</span>
+              <span className="tabular-nums">{queueItem?.progress ?? 0}%</span>
             </div>
           ) : isCompleted ? (
             <div className="flex items-center gap-2">
@@ -256,7 +246,7 @@ export const ResultCard = React.memo(function ResultCard({
         <div className="absolute bottom-0 left-0 w-full h-1 bg-muted rounded-b-2xl overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${progress?.progress ?? 0}%` }}
+            animate={{ width: `${queueItem?.progress ?? 0}%` }}
             className="h-full bg-gradient-to-r from-brand-orange to-brand-red"
           />
         </div>

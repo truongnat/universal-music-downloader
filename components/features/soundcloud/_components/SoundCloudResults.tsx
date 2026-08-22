@@ -87,8 +87,6 @@ export const SoundCloudResults = React.forwardRef<
                 <ResultCard
                   item={item}
                   mp3QualityKbps={mp3QualityKbps}
-                  progress={getProgress(item.id)}
-                  onDownload={onDownloadSingle}
                   isDownloadingAll={isAnyLoading}
                   activePreviewId={previewItem?.id}
                   onPreview={onPreview}

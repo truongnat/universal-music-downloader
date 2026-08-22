@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Link as LinkIcon, Loader2, Music, Youtube, ArrowRight, Clipboard, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -25,8 +25,22 @@ export function UnifiedControls({
     const dict = dictionary;
     const { mp3QualityKbps, setMp3QualityKbps } = useQuality();
     const inputRef = useRef<HTMLInputElement>(null);
-    const [isFocused, setIsFocused] = React.useState(false);
-    const [hasPasted, setHasPasted] = React.useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const [hasPasted, setHasPasted] = useState(false);
+    const [isDragOver, setIsDragOver] = useState(false);
+
+    // Keyboard shortcut: Cmd/Ctrl+K to focus
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                inputRef.current?.focus();
+                inputRef.current?.select();
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const getServiceInfo = () => {
         const lower = inputValue.toLowerCase();
@@ -63,6 +77,47 @@ export function UnifiedControls({
         inputRef.current?.focus();
     };
 
+    // Drag and drop handlers
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+
+        // Check for dropped text (URL)
+        const text = e.dataTransfer.getData('text/plain');
+        if (text) {
+            onInputChange(text.trim());
+            return;
+        }
+
+        // Check for dropped files with URL content
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const file = files[0];
+            // Try to read URL from file
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const content = event.target?.result as string;
+                if (content && content.startsWith('http')) {
+                    onInputChange(content.trim());
+                }
+            };
+            reader.readAsText(file);
+        }
+    }, [onInputChange]);
+
     return (
         <div className="w-full max-w-2xl mx-auto">
             <motion.div
@@ -71,23 +126,48 @@ export function UnifiedControls({
                 transition={{ duration: 0.6, delay: 0.3 }}
             >
                 {/* Main search bar */}
-                <div className="relative group">
-                    {/* Subtle glow on hover */}
-                    <div className="absolute -inset-2 bg-gradient-to-r from-brand-orange/10 via-brand-red/10 to-brand-orange/10 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <div
+                    className="relative group"
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                >
+                    {/* Subtle glow on hover / drag */}
+                    <div className={`
+                        absolute -inset-2 rounded-3xl blur-xl pointer-events-none transition-opacity duration-300
+                        ${isDragOver
+                            ? 'bg-gradient-to-r from-brand-orange/30 via-brand-red/30 to-brand-orange/30 opacity-100'
+                            : 'bg-gradient-to-r from-brand-orange/10 via-brand-red/10 to-brand-orange/10 opacity-0 group-hover:opacity-100'
+                        }
+                    `} />
 
                     {/* Container */}
-                    <div className="
-                        relative rounded-2xl border border-border/60 shadow-lg shadow-black/5 overflow-hidden transition-shadow duration-300
-                        hover:shadow-xl hover:shadow-black/8
-                    ">
+                    <div className={`
+                        relative rounded-2xl border overflow-hidden transition-all duration-300
+                        ${isDragOver
+                            ? 'border-brand-orange/50 shadow-xl shadow-brand-orange/10 scale-[1.01]'
+                            : 'border-border/60 shadow-lg shadow-black/5 hover:shadow-xl hover:shadow-black/8'
+                        }
+                    `}>
                         {/* Subtle inner gradient for depth */}
                         <div className="absolute inset-0 bg-gradient-to-b from-card to-card/95 pointer-events-none" />
+
                         {/* Input row */}
                         <div className="relative flex items-center gap-2 p-2.5">
-                            {/* Service icon / Search icon */}
+                            {/* Service icon / Search icon / Drop indicator */}
                             <div className="flex items-center justify-center w-12 h-12 shrink-0">
                                 <AnimatePresence mode="wait">
-                                    {serviceInfo ? (
+                                    {isDragOver ? (
+                                        <motion.div
+                                            key="drop"
+                                            initial={{ opacity: 0, scale: 0.5 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.5 }}
+                                            className="text-brand-orange"
+                                        >
+                                            <ArrowRight className="w-5 h-5 rotate-90" />
+                                        </motion.div>
+                                    ) : serviceInfo ? (
                                         <motion.div
                                             key={serviceInfo.label}
                                             initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
@@ -128,7 +208,10 @@ export function UnifiedControls({
                                         handleClear();
                                     }
                                 }}
-                                placeholder={dict?.common?.placeholder_unified || "Paste a SoundCloud or YouTube link..."}
+                                placeholder={isDragOver
+                                    ? "Drop URL here..."
+                                    : (dict?.common?.placeholder_unified || "Paste a SoundCloud or YouTube link...")
+                                }
                                 className="flex-1 h-12 text-base bg-transparent border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted-foreground/40 text-foreground"
                                 autoComplete="off"
                                 spellCheck={false}
@@ -264,9 +347,12 @@ export function UnifiedControls({
                                     </kbd>
                                 </motion.div>
                             ) : (
-                                <p className="text-[11px] text-muted-foreground/50 hidden sm:block">
-                                    Tracks & playlists • Auto-detect
-                                </p>
+                                <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/50">
+                                    <span>Tracks & playlists</span>
+                                    <span>•</span>
+                                    <kbd className="px-1.5 py-0.5 rounded bg-muted text-[9px] font-mono border border-border/50">⌘K</kbd>
+                                    <span>to focus</span>
+                                </div>
                             )}
                         </div>
                     </div>

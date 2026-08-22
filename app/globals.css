@@ -113,19 +113,20 @@ h1, h2, h3, h4, h5, h6 {
   outline-offset: 2px;
 }
 
-/* Remove focus outline on search input */
+/* Remove focus outline on inputs */
 input[type="text"]:focus,
 input[type="text"]:focus-visible,
 input[type="url"]:focus,
-input[type="url"]:focus-visible {
+input[type="url"]:focus-visible,
+input:focus,
+input:focus-visible {
   outline: none;
   box-shadow: none;
-  ring: 0;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: color, background-color, border-color, box-shadow, opacity;
+/* Smooth transitions for interactive elements only */
+a, button, [role="button"], input, textarea, select, .group-hover, [class*="hover:"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }

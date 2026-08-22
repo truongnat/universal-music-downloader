@@ -9,20 +9,17 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   Music,
   Youtube,
   RotateCcw,
   Minimize2,
-  Maximize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDownloadQueue, DownloadItem } from '@/contexts/DownloadQueueProvider';
 
 export function DownloadQueue() {
-  const { queue, clearCompleted, clearAll } = useDownloadQueue();
+  const { queue, clearCompleted, clearAll, cancelItem, retryItem, removeFromQueue } = useDownloadQueue();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -116,7 +113,13 @@ export function DownloadQueue() {
             <div className="overflow-y-auto max-h-64 p-2 space-y-1.5">
               <AnimatePresence>
                 {queue.map((item) => (
-                  <DownloadQueueItem key={item.id} item={item} />
+                  <DownloadQueueItem
+                    key={item.id}
+                    item={item}
+                    onCancel={cancelItem}
+                    onRetry={retryItem}
+                    onRemove={removeFromQueue}
+                  />
                 ))}
               </AnimatePresence>
             </div>
@@ -154,9 +157,17 @@ export function DownloadQueue() {
   );
 }
 
-function DownloadQueueItem({ item }: { item: DownloadItem }) {
-  const { cancelItem, retryItem, removeFromQueue } = useDownloadQueue();
-
+const DownloadQueueItem = React.memo(function DownloadQueueItem({
+  item,
+  onCancel,
+  onRetry,
+  onRemove,
+}: {
+  item: DownloadItem;
+  onCancel: (id: string) => void;
+  onRetry: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
   const statusIcon = () => {
     switch (item.status) {
       case 'queued':
@@ -241,7 +252,7 @@ function DownloadQueueItem({ item }: { item: DownloadItem }) {
             variant="ghost"
             size="icon"
             className="h-6 w-6"
-            onClick={() => cancelItem(item.id)}
+            onClick={() => onCancel(item.id)}
           >
             <X className="w-3 h-3" />
           </Button>
@@ -251,7 +262,7 @@ function DownloadQueueItem({ item }: { item: DownloadItem }) {
             variant="ghost"
             size="icon"
             className="h-6 w-6"
-            onClick={() => retryItem(item.id)}
+            onClick={() => onRetry(item.id)}
           >
             <RotateCcw className="w-3 h-3" />
           </Button>
@@ -261,7 +272,7 @@ function DownloadQueueItem({ item }: { item: DownloadItem }) {
             variant="ghost"
             size="icon"
             className="h-6 w-6"
-            onClick={() => removeFromQueue(item.id)}
+            onClick={() => onRemove(item.id)}
           >
             <Trash2 className="w-3 h-3" />
           </Button>
@@ -269,4 +280,4 @@ function DownloadQueueItem({ item }: { item: DownloadItem }) {
       </div>
     </motion.div>
   );
-}
+});

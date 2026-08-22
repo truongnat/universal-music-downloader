@@ -19,14 +19,12 @@ export interface DownloadItem {
   error?: string;
   retries: number;
   maxRetries: number;
-  blob?: Blob;
   filename?: string;
   createdAt: number;
 }
 
 interface DownloadQueueContextType {
   queue: DownloadItem[];
-  isProcessing: boolean;
   maxParallel: number;
   addToQueue: (item: Omit<DownloadItem, 'id' | 'status' | 'progress' | 'retries' | 'maxRetries' | 'createdAt'>) => string;
   removeFromQueue: (id: string) => void;
@@ -54,8 +52,9 @@ function generateId(): string {
 export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<DownloadItem[]>([]);
   const [maxParallel, setMaxParallel] = useState(MAX_PARALLEL_DEFAULT);
-  const [isProcessing, setIsProcessing] = useState(false);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // Track which items are actively being fetched to avoid duplicate starts
+  const activeDownloadsRef = useRef<Set<string>>(new Set());
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -74,11 +73,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  // Save to localStorage when queue changes
+  // Save to localStorage when queue changes (without blob or large data)
   useEffect(() => {
     try {
-      // Only save non-blob data
-      const toSave = queue.map(({ blob, ...rest }) => rest);
+      const toSave = queue.map(({ filename, ...rest }) => rest);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch {}
   }, [queue]);
@@ -106,6 +104,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       controller.abort();
       abortControllersRef.current.delete(id);
     }
+    activeDownloadsRef.current.delete(id);
     setQueue(prev => prev.filter(item => item.id !== id));
   }, []);
 
@@ -115,6 +114,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       controller.abort();
       abortControllersRef.current.delete(id);
     }
+    activeDownloadsRef.current.delete(id);
     setQueue(prev => prev.map(item =>
       item.id === id ? { ...item, status: 'cancelled' as const } : item
     ));
@@ -122,8 +122,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retryItem = useCallback((id: string) => {
+    activeDownloadsRef.current.delete(id);
     setQueue(prev => prev.map(item =>
-      item.id === id ? { ...item, status: 'queued' as const, progress: 0, error: undefined } : item
+      item.id === id ? { ...item, status: 'queued' as const, progress: 0, error: undefined, retries: 0 } : item
     ));
   }, []);
 
@@ -135,6 +136,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const clearAll = useCallback(() => {
     abortControllersRef.current.forEach(controller => controller.abort());
     abortControllersRef.current.clear();
+    activeDownloadsRef.current.clear();
     setQueue([]);
     toast.info('Cleared all downloads');
   }, []);
@@ -147,29 +149,12 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     return queue.find(item => item.id === id);
   }, [queue]);
 
-  // Process queue - download items
-  const processQueue = useCallback(async () => {
-    if (isProcessing) return;
+  // Download a single item — uses functional state updates to avoid stale closures
+  const downloadItem = useCallback(async (item: DownloadItem) => {
+    // Guard: don't start if already active
+    if (activeDownloadsRef.current.has(item.id)) return;
+    activeDownloadsRef.current.add(item.id);
 
-    const pendingItems = queue.filter(item => item.status === 'queued');
-    const downloadingCount = queue.filter(item => item.status === 'downloading').length;
-
-    if (pendingItems.length === 0 || downloadingCount >= maxParallel) return;
-
-    setIsProcessing(true);
-
-    const slotsAvailable = maxParallel - downloadingCount;
-    const itemsToProcess = pendingItems.slice(0, slotsAvailable);
-
-    for (const item of itemsToProcess) {
-      // Start download in background
-      downloadItem(item);
-    }
-
-    setIsProcessing(false);
-  }, [queue, maxParallel, isProcessing]);
-
-  const downloadItem = async (item: DownloadItem) => {
     const controller = new AbortController();
     abortControllersRef.current.set(item.id, controller);
 
@@ -195,18 +180,19 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       const safeTitle = item.title.replace(/[^a-zA-Z0-9\s\-_()]/g, '_').substring(0, 100);
       const filename = `${safeTitle}.${item.format}`;
 
-      // Trigger download
-      const url = URL.createObjectURL(blob);
+      // Trigger download to disk immediately — don't hold blob in memory
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = blobUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(blobUrl);
 
+      // Mark completed WITHOUT storing blob
       setQueue(prev => prev.map(q =>
-        q.id === item.id ? { ...q, status: 'completed' as const, progress: 100, blob, filename } : q
+        q.id === item.id ? { ...q, status: 'completed' as const, progress: 100, filename } : q
       ));
 
       // Save to history
@@ -235,52 +221,80 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       }
 
       const errorMsg = error.message || 'Download failed';
-      const currentRetries = item.retries + 1;
 
-      if (currentRetries < item.maxRetries) {
-        // Auto-retry with exponential backoff
-        const delay = Math.pow(2, currentRetries) * 1000;
-        setQueue(prev => prev.map(q =>
-          q.id === item.id ? {
-            ...q,
-            status: 'queued' as const,
-            progress: 0,
-            retries: currentRetries,
-            error: `${errorMsg} (retry ${currentRetries}/${item.maxRetries})`,
-          } : q
-        ));
+      // Read current retries from the queue using a ref pattern
+      setQueue(prev => {
+        const current = prev.find(q => q.id === item.id);
+        if (!current) return prev;
 
-        setTimeout(() => {
-          retryItem(item.id);
-        }, delay);
+        const currentRetries = current.retries + 1;
 
-        toast.warning(`Retrying "${item.title}" (${currentRetries}/${item.maxRetries})`);
-      } else {
-        setQueue(prev => prev.map(q =>
-          q.id === item.id ? {
-            ...q,
-            status: 'error' as const,
-            progress: 0,
-            error: errorMsg,
-            retries: currentRetries,
-          } : q
-        ));
-        toast.error(`Failed to download "${item.title}": ${errorMsg}`);
-      }
+        if (currentRetries < current.maxRetries) {
+          const delay = Math.pow(2, currentRetries) * 1000;
+          toast.warning(`Retrying "${item.title}" (${currentRetries}/${current.maxRetries})`);
+
+          // Schedule retry via setTimeout — no stale closure, we set status directly
+          setTimeout(() => {
+            activeDownloadsRef.current.delete(item.id);
+            setQueue(prev => prev.map(q =>
+              q.id === item.id ? { ...q, status: 'queued' as const, progress: 0, error: undefined } : q
+            ));
+          }, delay);
+
+          return prev.map(q =>
+            q.id === item.id ? {
+              ...q,
+              status: 'queued' as const,
+              progress: 0,
+              retries: currentRetries,
+              error: `${errorMsg} (retry ${currentRetries}/${current.maxRetries})`,
+            } : q
+          );
+        } else {
+          toast.error(`Failed to download "${item.title}": ${errorMsg}`);
+          return prev.map(q =>
+            q.id === item.id ? {
+              ...q,
+              status: 'error' as const,
+              progress: 0,
+              error: errorMsg,
+              retries: currentRetries,
+            } : q
+          );
+        }
+      });
     } finally {
       abortControllersRef.current.delete(item.id);
+      activeDownloadsRef.current.delete(item.id);
     }
-  };
+  }, []);
 
-  // Process queue periodically
+  // Process queue — uses functional state to avoid stale closures
   useEffect(() => {
-    processQueue();
-  }, [queue, processQueue]);
+    setQueue(prev => {
+      const pendingItems = prev.filter(item => item.status === 'queued');
+      const downloadingCount = prev.filter(item => item.status === 'downloading').length;
+
+      if (pendingItems.length === 0 || downloadingCount >= MAX_PARALLEL_DEFAULT) return prev;
+
+      const slotsAvailable = MAX_PARALLEL_DEFAULT - downloadingCount;
+      const itemsToProcess = pendingItems.slice(0, slotsAvailable);
+
+      // Start downloads outside of setState to avoid issues
+      // We use queueMicrotask to defer to avoid calling async functions inside setState
+      queueMicrotask(() => {
+        for (const item of itemsToProcess) {
+          downloadItem(item);
+        }
+      });
+
+      return prev; // Don't modify state in the effect, just trigger downloads
+    });
+  }, [queue, downloadItem]);
 
   return (
     <DownloadQueueContext.Provider value={{
       queue,
-      isProcessing,
       maxParallel,
       addToQueue,
       removeFromQueue,
